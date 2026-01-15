@@ -9,5 +9,7 @@ I'm sure everybody knows how to create branches, PRs, and merge. Make sure we co
 ## ACT setup (TEMPORARY)
 Don't install act, stdlib, annotate, and actsim seperately just use actflow
 If you are on a mac, try using brew to install
+
 https://github.com/asyncvlsi/homebrew-tap
+
 https://github.com/asyncvlsi/actflow
