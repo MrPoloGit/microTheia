@@ -29,7 +29,12 @@ In the next step, install LibreLane by following the Nix-based installation inst
 
 This repository contains a Nix flake that provides a shell with the [`leo/gf180mcu`](https://github.com/librelane/librelane/tree/leo/gf180mcu) branch of LibreLane.
 
-Simply run `nix-shell` in the root of this repository.
+Simply run 
+```bash
+export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-25.05.tar.gz
+nix-shell
+```
+in the root of this repository.
 
 > [!NOTE]
 > Since we are working on a branch of LibreLane, OpenROAD needs to be compiled locally. This will be done automatically by Nix, and the binary will be cached locally. 
