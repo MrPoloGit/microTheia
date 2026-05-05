@@ -12,10 +12,7 @@ module evt2_decoder #(
     parameter int SCORE_BITS        = 36,
     parameter int WEIGHT_BITS       = 8,
     parameter bit REQUIRE_TIME_HIGH = 1'b1,
-    parameter bit SWAP_INPUT_BYTES  = 1'b0,
-    parameter bit MAP_SWAP_XY       = 1'b0,
-    parameter bit MAP_FLIP_X        = 1'b0,
-    parameter bit MAP_FLIP_Y        = 1'b0
+    parameter bit SWAP_INPUT_BYTES  = 1'b0
 )(
     input  logic                         clk,
     input  logic                         rst,
@@ -36,6 +33,8 @@ module evt2_decoder #(
     output logic [2:0]                   thresh_addr_o,
     output logic                         thresh_event_valid,
     output logic [33:0]                  ts_out,       // full 34-bit timestamp of last CD event
+    output logic [33:0]                  bin_length_us,
+    output logic                         bin_length_valid,
     output logic                         debug_req_o,
     output logic                         reload_req_o,
     output logic                         boot_req_o,
@@ -53,6 +52,11 @@ module evt2_decoder #(
     //Thresh: [4 bit type address], [18 bit upper/lower bits of threshold data], [3 bit threshold address], [7 don't care]
     localparam logic [3:0] EVT_THRESH_U   = 4'h3;
     localparam logic [3:0] EVT_THRESH_L   = 4'h4;
+    //adding programmable bin length opcode
+    //Bin length upper: [4 bit opcode], [11 Don't care] [17 bits upper bits of bin length]
+    localparam logic [3:0] BIN_LENGTH_U   = 4'h5; //5 is not specified in public prophesee documentation, but they do mention other non-documented event types exist and to contact them if seen
+    //Bin length lower: [4 bit opcode], [11 Don't care] [17 bits lower bits of bin length]
+    localparam logic [3:0] BIN_LENGTH_L   = 4'h6; // 6 is the EXT_TRIGGER event type for EVT2.0, we have no external devices connected to the sensor so it will not be present in the stream.
     //No important address structure, only OPCODE matters
     localparam logic [3:0] EVT_TIME_HIGH  = 4'h8;
     localparam logic [3:0] DEBUG_REQ      = 4'ha;
@@ -86,55 +90,37 @@ module evt2_decoder #(
 
     logic [10:0]          x_clamped;
     logic [10:0]          y_clamped;
-    logic [10:0]          x_oriented;
-    logic [10:0]          y_oriented;
-    logic [10:0]          x_swapped_raw;
-    logic [10:0]          y_swapped_raw;
     logic [GRID_BITS-1:0] x_grid;
     logic [GRID_BITS-1:0] y_grid;
     logic [10+DIV_K:0]    x_prod_c, y_prod_c;
     logic [GRID_BITS:0]   x_grid_raw, y_grid_raw;
 
     logic [17:0]          thresh_reg;
+    logic [16:0]          bin_length_reg;
 
     always_comb begin
+        
+        // For the GenX320, legal X values are 0 through 319.
         if (x_raw >= SENSOR_WIDTH)
             x_clamped = SENSOR_W_M1[10:0];
         else
             x_clamped = x_raw;
 
+       
+        // For the GenX320, legal Y values are 0 through 319.
         if (y_raw >= SENSOR_HEIGHT)
             y_clamped = SENSOR_H_M1[10:0];
         else
             y_clamped = y_raw;
 
-        // Optional coordinate remap to align sensor orientation with trained model.
-        x_swapped_raw = MAP_SWAP_XY ? y_clamped : x_clamped;
-        y_swapped_raw = MAP_SWAP_XY ? x_clamped : y_clamped;
+        x_prod_c   = x_clamped * X_M;
+        y_prod_c   = y_clamped * Y_M;
 
-        // Re-clamp after optional swap in case SENSOR_WIDTH != SENSOR_HEIGHT.
-        if (x_swapped_raw >= SENSOR_WIDTH)
-            x_oriented = SENSOR_W_M1[10:0];
-        else
-            x_oriented = x_swapped_raw;
-
-        if (y_swapped_raw >= SENSOR_HEIGHT)
-            y_oriented = SENSOR_H_M1[10:0];
-        else
-            y_oriented = y_swapped_raw;
-
-        if (MAP_FLIP_X)
-            x_oriented = SENSOR_W_M1[10:0] - x_oriented;
-        if (MAP_FLIP_Y)
-            y_oriented = SENSOR_H_M1[10:0] - y_oriented;
-
-        // Reciprocal-multiply: floor(v/D) = (v*M) >> DIV_K, exact for v < SENSOR_DIM.
-        x_prod_c   = x_oriented * X_M;
-        y_prod_c   = y_oriented * Y_M;
-
+        // shift the multiplied result down to get the raw grid coordinate.
         x_grid_raw = x_prod_c >> DIV_K;
         y_grid_raw = y_prod_c >> DIV_K;
 
+        // clamp the raw grid coordinate to GRID_SIZE-1.
         x_grid = (x_grid_raw >= GRID_SIZE) ? GRID_SIZE-1 : x_grid_raw;
         y_grid = (y_grid_raw >= GRID_SIZE) ? GRID_SIZE-1 : y_grid_raw;
     end
@@ -163,6 +149,9 @@ module evt2_decoder #(
             boot_req_o         <= 1'b0;
             reload_req_o       <= 1'b0;
             debug_req_o        <= 1'b0;
+            bin_length_us    <= '0;
+            bin_length_valid <= 1'b0;
+            bin_length_reg   <= '0;
         end else begin
             event_valid        <= 1'b0;
             weight_event_valid <= 1'b0;
@@ -171,6 +160,7 @@ module evt2_decoder #(
             boot_req_o         <= 1'b0;
             reload_req_o       <= 1'b0;
             debug_req_o        <= 1'b0;
+            bin_length_valid   <= 1'b0;
 
             if (data_valid && data_ready) begin
                 case (pkt_type)
@@ -211,6 +201,19 @@ module evt2_decoder #(
                             thresh_event_valid   <= 1'b1;
                         end
                     end
+                    // matching approach for thresholds
+                    // latch upper bits and wait until lower seen
+                    BIN_LENGTH_U: begin
+                        if (evt_ld_en) begin
+                            bin_length_reg <= evt_word [16:0];
+                        end
+                    end
+                    BIN_LENGTH_L: begin
+                        if (evt_ld_en) begin
+                            bin_length_us        <= {bin_length_reg, evt_word[16:0]};
+                            bin_length_valid     <= 1'b1;
+                        end
+                    end 
 
                     EVT_READS_DONE: begin
                         evt_reads_done <= 1'b1;
