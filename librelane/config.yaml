@@ -59,11 +59,11 @@ VERILOG_FILES:
 - dir::../src/voxel_gesture_classifier.sv
 - dir::../src/selectable_debug.sv
 - dir::../src/gf180_sram_1r1w.sv
-- dir::../src/verilog_spi/spi_module.v
-- dir::../src/verilog_spi/spi2.v
-- dir::../src/verilog_spi/clock_divider.v
-- dir::../src/verilog_spi/pos_edge_det.v
-- dir::../src/verilog_spi/neg_edge_det.v
+- dir::../third_party/verilog_spi/spi_module.v
+- dir::../third_party/verilog_spi/spi2.v
+- dir::../third_party/verilog_spi/clock_divider.v
+- dir::../third_party/verilog_spi/pos_edge_det.v
+- dir::../third_party/verilog_spi/neg_edge_det.v
 
 # Enable plugin for better SystemVerilog support
 # USE_SLANG: True
