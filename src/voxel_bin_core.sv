@@ -50,9 +50,6 @@ module voxel_bin_core #(
     localparam int FEATURE_COUNT    = READOUT_BINS * GRID_SIZE * GRID_SIZE;
     localparam int FEATURE_BITS     = $clog2(FEATURE_COUNT);
 
-    localparam int MAP_SWAP_XY = 0;
-    localparam int MAP_FLIP_X  = 0;
-    localparam int MAP_FLIP_Y  = 0;
 
     // Internal wires
     logic        fifo_out_valid;
@@ -76,6 +73,8 @@ module voxel_bin_core #(
     logic [2:0]                     dec_thresh_addr_o;
     logic [2:0]                     dec_thresh_5xaddr_o;
     logic                           dec_thresh_event_valid;
+    logic [33:0]                    bin_length_us; //for programmable bin length
+    logic                           bin_length_valid;
     assign dec_thresh_5xaddr_o = dec_thresh_addr_o;
     
 
@@ -261,10 +260,7 @@ module voxel_bin_core #(
         .GRID_SIZE        (GRID_SIZE),
         .SCORE_BITS       (SCORE_BITS), 
         .WEIGHT_BITS      (WEIGHT_BITS),
-        .REQUIRE_TIME_HIGH(REQUIRE_TIME_HIGH),
-        .MAP_SWAP_XY      (MAP_SWAP_XY),
-        .MAP_FLIP_X       (MAP_FLIP_X),
-        .MAP_FLIP_Y       (MAP_FLIP_Y)
+        .REQUIRE_TIME_HIGH(REQUIRE_TIME_HIGH)
     ) u_evt2_decoder (
         .clk                (clk),
         .rst                (rst),
@@ -288,6 +284,8 @@ module voxel_bin_core #(
         .debug_req_o        (debug_req_o),
         .reload_req_o       (reload_req_o),
         .boot_req_o         (boot_req_o),
+        .bin_length_us      (bin_length_us),
+        .bin_length_valid   (bin_length_valid),
         .decoder_dbg        (decoder_dbg),
         .decoder_output_dbg (decoder_output_dbg),
         .debug_page_sel     (debug_page_sel)
@@ -308,6 +306,8 @@ module voxel_bin_core #(
         .event_valid     (dec_event_valid),
         .event_x         (dec_x16),
         .event_y         (dec_y16),
+        .bin_length_us   (bin_length_us),
+        .bin_length_valid(bin_length_valid),
         .ts_in           (dec_ts_out),
         .force_rollover_i(force_rollover_i),
         .event_ready     (binner_event_ready),
@@ -360,7 +360,7 @@ module voxel_bin_core #(
     endgenerate
 
     // ------------------------------------------------------------------
-    // Threshold SRAM (writable at runtime; addr 0-3 = class, 4-7 = diff)
+    // Threshold SRAM (writable at runtime; addr 0-3 = class, 4-7 = diff) 
     // ------------------------------------------------------------------
     gf180_sram_1r1w #(
         .width_p(SCORE_BITS),

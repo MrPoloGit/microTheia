@@ -16,9 +16,7 @@
 // one cycle after the corresponding read.  Readout takes FEATURE_COUNT + 1 cycles
 // (one extra drain cycle to collect the final Q).
 
-//
 module voxel_binning #(
-    parameter  int WINDOW_MS      = 1000,
     parameter  int GRID_SIZE      = 16,
     parameter  int NUM_BINS       = 8,
     parameter  int READOUT_BINS   = 8,
@@ -32,6 +30,8 @@ module voxel_binning #(
     input  logic [$clog2(GRID_SIZE)-1:0]      event_y,
     input  logic [33:0]                       ts_in,          // 34-bit EVT2 timestamp (us), valid with event_valid
     input  logic                              force_rollover_i, // pulse high for one cycle to force a bin advance (test use)
+    input  logic [33:0]                       bin_length_us,
+    input  logic                              bin_length_valid,  
     output logic                              event_ready,
     input  logic                              readout_ready,
     output logic                              readout_start,
@@ -49,8 +49,20 @@ module voxel_binning #(
     localparam int CELL_BITS           = (CELLS_PER_BIN > 1) ? $clog2(CELLS_PER_BIN) : 1;
     localparam int BIN_COUNT_BITS      = $clog2(NUM_BINS + 1);
     localparam int MEM_ADDR_BITS       = $clog2(TOTAL_CELLS > 1 ? TOTAL_CELLS : 2);
-    localparam int BIN_DURATION_US      = (WINDOW_MS * 1000) / READOUT_BINS;
-    localparam logic [33:0] BIN_DURATION_TS = 34'(BIN_DURATION_US);
+    //adding support for user programmable bin length, so removing theses parameters
+    localparam logic [33:0] DEFAULT_BIN_LENGTH = 34'd125000; // default is 125 ms bins aka 1 second window (8 bins in system)
+
+    // bin length simply comes in like weights or thresholds, when decoded is routed to this register
+    logic [33:0] bin_duration_ts;
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            bin_duration_ts <= DEFAULT_BIN_LENGTH;
+        end
+        else if(bin_length_valid && (bin_length_us != 34'd0)) begin //added non zero check to prevent triggering an infinite loop of bin rollovers when bin length is 0
+            bin_duration_ts <= bin_length_us;
+        end        
+    end    
+
 
     initial begin
         if (READOUT_BINS > NUM_BINS)
@@ -173,7 +185,7 @@ module voxel_binning #(
         do_rollover = !rmw_pending &&
                       (force_rollover_i ||
                        (acc_event_valid && ts_initialized &&
-                        ((acc_event_ts - bin_start_ts) >= BIN_DURATION_TS)));
+                        ((acc_event_ts - bin_start_ts) >= bin_duration_ts)));
     end
 
     // ------------------------------------------------------------------
@@ -308,7 +320,7 @@ module voxel_binning #(
                             pending_event_ts    <= ts_in;
                         end
                         if (ts_initialized)
-                            bin_start_ts <= bin_start_ts + BIN_DURATION_TS;
+                            bin_start_ts <= bin_start_ts + bin_duration_ts;
                         clear_bin_idx  <= next_wr_bin;
                         completed_bins <= completed_bins_next;
 
