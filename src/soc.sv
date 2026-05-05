@@ -3,7 +3,6 @@
 `timescale 1ns/1ps
 
 //cleaned up top level packaging of entire voxel binning -> classification system
-//TODO: remove deprecated ports from voxel_bin_core module that are not present here
 //using the third party SPI introduces some extra latency cycles because it is strongly transaction oriented
 module soc #(
     parameter int CLK_FREQ_HZ          = 32_000_000,
@@ -62,7 +61,7 @@ module soc #(
         .spi_ready          (spi_ready)
     );
 
-    voxel_bin_core #( //I believe these are the only parameters we want in production, any others present in the module should be considered for removal
+    voxel_bin_core #( 
         .CLK_FREQ_HZ      (CLK_FREQ_HZ),
         .WINDOW_MS        (WINDOW_MS),
         .GRID_SIZE        (GRID_SIZE),
@@ -76,7 +75,7 @@ module soc #(
         .WEIGHT_BITS      (WEIGHT_BITS),
         .NUM_CLASSES      (NUM_CLASSES),
         .SCORE_BITS       (SCORE_BITS)
-    ) u_core ( //I am excluding several ports that need to be removed from module rather than listing them here and tieing them off.
+    ) u_core ( 
         .clk                        (clk),
         .rst                        (rst),
         .evt_word                   (evt_word),
