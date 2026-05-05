@@ -295,7 +295,6 @@ module voxel_bin_core #(
     // Voxel binning
     // ------------------------------------------------------------------
     voxel_binning #(
-        .WINDOW_MS    (WINDOW_MS),
         .GRID_SIZE    (GRID_SIZE),
         .NUM_BINS     (NUM_BINS),
         .READOUT_BINS (READOUT_BINS),
