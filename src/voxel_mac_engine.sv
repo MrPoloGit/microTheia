@@ -45,7 +45,7 @@ module voxel_mac_engine #(
     logic [SCORE_BITS-1:0]  score_acc [0:NUM_CLASSES-1];
 
     // rd_addr held at 0 when idle to avoid X propagation in simulation.
-    assign rd_en   = (state == ST_STREAM) && (stream_idx < FEATURE_COUNT);
+    assign rd_en   = (state == ST_STREAM) && (stream_idx < STREAM_BITS'(FEATURE_COUNT));
     assign rd_addr = rd_en ? stream_idx[ADDR_BITS-1:0] : '0;
     assign busy    = (state != ST_IDLE);
 
@@ -54,7 +54,7 @@ module voxel_mac_engine #(
             scores_flat[g*SCORE_BITS +: SCORE_BITS] = score_acc[g];
     end
 
-    
+
     //score busses for debug pins
     //only taking lower 32 bits from each score
     assign score_A = scores_flat[31:0];       // from [35:0]
@@ -77,7 +77,7 @@ module voxel_mac_engine #(
             // mac_valid is delayed one cycle to match synchronous RAM read latency.
             // The first rd_en fires at T+1 (state=ST_STREAM, idx=0), so the first
             // valid SRAM data arrives at T+2 — mac_valid=1 at T+2 is correct.
-            mac_valid <= (state == ST_STREAM) && (stream_idx < FEATURE_COUNT);
+            mac_valid <= (state == ST_STREAM) && (stream_idx < STREAM_BITS'(FEATURE_COUNT));
             mac_last  <= (state == ST_STREAM) && (stream_idx == STREAM_BITS'(FEATURE_COUNT - 1));
 
             case (state)
@@ -91,7 +91,7 @@ module voxel_mac_engine #(
                 end
 
                 ST_STREAM: begin
-                    if (stream_idx < FEATURE_COUNT)
+                    if (stream_idx < STREAM_BITS'(FEATURE_COUNT))
                         stream_idx <= stream_idx + 1'b1;
 
                     if (mac_valid) begin
@@ -100,7 +100,7 @@ module voxel_mac_engine #(
                             // zero-extended to SCORE_BITS before accumulation.
                             logic [COUNTER_BITS+WEIGHT_BITS-1:0] product;
                             product = feature_data *
-                                      weight_data_flat[g*WEIGHT_BITS +: WEIGHT_BITS]; 
+                                      weight_data_flat[g*WEIGHT_BITS +: WEIGHT_BITS];
                             score_acc[g] <= score_acc[g] + SCORE_BITS'(product);
                         end
                     end

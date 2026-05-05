@@ -32,7 +32,7 @@ module spi_wrapper #(
     logic process_next_word;
     logic processing_word_d;
     logic word_held;
-    logic CS_d, request_next, spi_abort_rst, spi_do_rst;
+    logic CS_d, spi_abort_rst, spi_do_rst;
     assign spi_do_rst = rst | spi_abort_rst;
 
     logic [2:0] classification_output;
@@ -42,9 +42,13 @@ module spi_wrapper #(
         .SPI_WORD_LEN (DATA_WIDTH)
     ) spi_slave (
         .master_clock      (clk),
+        /* verilator lint_off PINCONNECTEMPTY */
         .SCLK_OUT          (),
+        /* verilator lint_on PINCONNECTEMPTY */
         .SCLK_IN           (SCLK),
+        /* verilator lint_off PINCONNECTEMPTY */
         .SS_OUT            (),
+        /* verilator lint_on PINCONNECTEMPTY */
         .SS_IN             (CS),
         .OUTPUT_SIGNAL     (MISO),
         .processing_word   (processing_word),

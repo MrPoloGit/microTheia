@@ -99,16 +99,16 @@ module evt2_decoder #(
     logic [16:0]          bin_length_reg;
 
     always_comb begin
-        
+
         // For the GenX320, legal X values are 0 through 319.
-        if (x_raw >= SENSOR_WIDTH)
+        if (x_raw >= 11'(SENSOR_WIDTH))
             x_clamped = SENSOR_W_M1[10:0];
         else
             x_clamped = x_raw;
 
-       
+
         // For the GenX320, legal Y values are 0 through 319.
-        if (y_raw >= SENSOR_HEIGHT)
+        if (y_raw >= 11'(SENSOR_HEIGHT))
             y_clamped = SENSOR_H_M1[10:0];
         else
             y_clamped = y_raw;
@@ -187,7 +187,7 @@ module evt2_decoder #(
                             weight_event_valid <= 1'b1;
                         end
                     end
-                    
+
                     EVT_THRESH_U: begin
                         if (evt_ld_en) begin
                             thresh_reg <= evt_word[27:10];
@@ -213,7 +213,7 @@ module evt2_decoder #(
                             bin_length_us        <= {bin_length_reg, evt_word[16:0]};
                             bin_length_valid     <= 1'b1;
                         end
-                    end 
+                    end
 
                     EVT_READS_DONE: begin
                         evt_reads_done <= 1'b1;

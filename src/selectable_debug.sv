@@ -48,7 +48,7 @@ bit index       description
 15              read_address[0]
 16              read_address[1]
 17              read_address[2]
-18              read_address[3] 
+18              read_address[3]
 19              read_address[4]
 20              read_address[5]
 21              read_address[6]
@@ -111,7 +111,7 @@ bit index       description
 7               y_out[1]
 8               y_out[2]
 9               y_out[3]
-10              data_valid 
+10              data_valid
 11              event_ready_i       //end evt2_decoder
 12              ready_i             //start input_FIFO
 13              valid_i
@@ -137,7 +137,7 @@ bit index       description
 PAGE 3 (debug_select = 4'b0011): FSM debug
 bit index       description
 [11:0]          fsm_debug_bus  ->    main_state_dbg_o [11:6] load_state_dbg_o [5:2] boot_fail_o [1] boot_done_o [0]
-[31:12]          reserved         
+[31:12]          reserved
 
 PAGE 4 (debug_select = 4'b0100): evt2_decoder event output
 bit index       description
@@ -190,7 +190,7 @@ always_comb begin
         PAGE_3: begin
             selected_debug = {20'b0, fsm_debug_bus};
         end
-        
+
         PAGE_4: begin
             selected_debug = {decoder_output};
         end

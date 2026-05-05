@@ -57,12 +57,12 @@ module voxel_bin_core #(
     logic [31:0] fifo_out_data;
 
     logic [7:0] debug_event_count;
-    
+
     //FSM wires
     logic boot_req_o;
     logic reload_req_o;
     logic debug_req_o;
-    
+
     //EVT2Decoder Wires
     logic                           evt_reads_done;
     logic [WEIGHT_BITS-1:0]         dec_weight_data_o;
@@ -76,14 +76,14 @@ module voxel_bin_core #(
     logic [33:0]                    bin_length_us; //for programmable bin length
     logic                           bin_length_valid;
     assign dec_thresh_5xaddr_o = dec_thresh_addr_o;
-    
+
 
     logic [($clog2(GRID_SIZE))-1:0] dec_x16;
     logic [($clog2(GRID_SIZE))-1:0] dec_y16;
     logic [33:0]                    dec_ts_out;
     logic                           dec_event_valid;
     logic                           dec_data_ready;
-    
+
     //VoxelBinning Wires
     logic                    binner_event_ready;
     logic                    binner_readout_ready;
@@ -92,7 +92,7 @@ module voxel_bin_core #(
     logic [COUNTER_BITS-1:0] binner_readout_data;
     logic [FEATURE_BITS-1:0] binner_readout_index;
     logic                    binner_readout_last;
-    
+
     //Feature RAM Wires
     logic capture_active;
     logic feature_window_ready;
@@ -104,7 +104,7 @@ module voxel_bin_core #(
     logic [FEATURE_BITS-1:0] weight_rd_addr;
     logic                    weight_rd_valid;
     logic [WEIGHT_BITS-1:0]  weight_rd_raw [0:NUM_CLASSES-1];
-    
+
     //MAC Wires
     logic                               mac_start;
     logic                               mac_busy;
@@ -113,7 +113,7 @@ module voxel_bin_core #(
     logic [NUM_CLASSES*WEIGHT_BITS-1:0] mac_weight_flat;
     logic [NUM_CLASSES*SCORE_BITS-1:0]  mac_scores_flat;
     logic                               mac_scores_valid;
-    
+
     //Gesture Classififer Wires
     logic [1:0] class_gesture;
     logic       class_valid;
@@ -122,7 +122,7 @@ module voxel_bin_core #(
     logic                  thresh_rd_valid;
     logic [2:0]            thresh_rd_addr;
     logic [SCORE_BITS-1:0] thresh_data;
-    
+
     //Controller Wires
     logic                  evt_ld_en;
     logic                  core_rst_o;
@@ -134,7 +134,7 @@ module voxel_bin_core #(
     // Gated SRAM write valids that only pass through in PROGRAM mode
     logic weight_wr_valid_gated;
     logic thresh_wr_valid_gated;
- 
+
     assign weight_wr_valid_gated = dec_weight_event_valid && evt_ld_en; //enables srams to be written to when in load state and the READ_DONE word not sent
     assign thresh_wr_valid_gated = dec_thresh_event_valid && evt_ld_en;
 
@@ -215,7 +215,7 @@ module voxel_bin_core #(
 
     // ------------------------------------------------------------------
     // Controller FSM
-    // ------------------------------------------------------------------    
+    // ------------------------------------------------------------------
     control_fsm controller_fsm (
         .clk               (clk),
         .rst_n             (~rst),
@@ -225,7 +225,7 @@ module voxel_bin_core #(
         .evt_reads_done    (evt_reads_done), //output from decoder READ_DONE word
         .evt_ld_bypass     (1'b0), //bypass signal for not loading any weights into the SRAMs, probably keep at 0 for all intensive purposes
 
-        .evt_ld_en         (evt_ld_en), //Output in load state that allows 
+        .evt_ld_en         (evt_ld_en), //Output in load state that allows
         .core_rst_o        (core_rst_o), //unused output that is on when not in run state
         .boot_done_o       (boot_done_o), //debug signal for the boot process finishing   - 1 bit
         .boot_fail_o       (boot_fail_o), //debug signal for being in the boot fail load state - 1 bit
@@ -258,7 +258,7 @@ module voxel_bin_core #(
         .SENSOR_WIDTH     (SENSOR_WIDTH),
         .SENSOR_HEIGHT    (SENSOR_HEIGHT),
         .GRID_SIZE        (GRID_SIZE),
-        .SCORE_BITS       (SCORE_BITS), 
+        .SCORE_BITS       (SCORE_BITS),
         .WEIGHT_BITS      (WEIGHT_BITS),
         .REQUIRE_TIME_HIGH(REQUIRE_TIME_HIGH)
     ) u_evt2_decoder (
@@ -359,7 +359,7 @@ module voxel_bin_core #(
     endgenerate
 
     // ------------------------------------------------------------------
-    // Threshold SRAM (writable at runtime; addr 0-3 = class, 4-7 = diff) 
+    // Threshold SRAM (writable at runtime; addr 0-3 = class, 4-7 = diff)
     // ------------------------------------------------------------------
     gf180_sram_1r1w #(
         .width_p(SCORE_BITS),
@@ -440,8 +440,10 @@ module voxel_bin_core #(
         .score_D       (score_D),
         .fifo_in       (evt_word),
         .fifo_out      (fifo_out_data),
-        //input [31:0] control_dbg,
-        .debug_select  (debug_page_sel) 
+        /* verilator lint_off PINMISSING */
+        .fsm_debug_bus (),
+        /* verilator lint_off PINMISSING */
+        .debug_select  (debug_page_sel)
     );
 
     assign debug_mux = debug_bus;

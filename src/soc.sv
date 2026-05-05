@@ -14,7 +14,9 @@ module soc #(
     parameter int COUNTER_BITS         = 16,
     parameter int FIFO_DEPTH           = 256,
     parameter int DATA_WIDTH           = 32,
+    /* verilator lint_off UNUSEDPARAM */
     parameter int REQUIRE_TIME_HIGH    = 1,
+    /* verilator lint_on UNUSEDPARAM */
     parameter int SENSOR_WIDTH         = 320,
     parameter int SENSOR_HEIGHT        = 320,
     parameter int WEIGHT_BITS          = 8,
@@ -82,7 +84,7 @@ module soc #(
         .evt_word_ready             (evt_word_ready),
         .gesture                    (gesture), //2 bits to support 4 classes/gestures
         .gesture_valid              (gesture_valid), //1 bit
-        .gesture_confidence         (gesture_confidence), // 1 bit 
+        .gesture_confidence         (gesture_confidence), // 1 bit
         .debug_mux                  (debug_bus),
         .force_rollover_i           (1'b0) // maintaing for ease of access during end-to-end testing
     );

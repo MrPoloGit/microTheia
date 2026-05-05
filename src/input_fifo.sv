@@ -18,7 +18,8 @@ module input_fifo #(
 
     localparam int FIFO_DEPTH_LOG2 = $clog2(FIFO_DEPTH);
 
-    localparam int depth_p = (1 << FIFO_DEPTH_LOG2);
+    localparam int                       depth_p = (1 << FIFO_DEPTH_LOG2);
+    localparam logic [FIFO_DEPTH_LOG2:0] DEPTH_W = (FIFO_DEPTH_LOG2+1)'(depth_p);
 
     logic [FIFO_DEPTH_LOG2-1:0] wr_ptr;
     logic [FIFO_DEPTH_LOG2-1:0] rd_ptr;
@@ -40,8 +41,10 @@ module input_fifo #(
     logic write_to_ram;
     logic issue_ram_read;
 
-    assign total_count = tail_count + out_valid_r + rd_pending;
-    assign ready_o     = (total_count < depth_p);
+    assign total_count = tail_count
+                       + (FIFO_DEPTH_LOG2+1)'(out_valid_r)
+                       + (FIFO_DEPTH_LOG2+1)'(rd_pending);
+    assign ready_o     = (total_count < DEPTH_W);
     assign valid_o     = out_valid_r;
     assign data_o      = out_data_r;
 
@@ -67,7 +70,7 @@ module input_fifo #(
 
     gf180_sram_1r1w #(
         .width_p(DATA_WIDTH),
-        .depth_p(depth_p)
+        .depth_p(DEPTH_W)
     ) u_fifo_mem (
         .clk_i      (clk_i),
         .reset_i    (reset_i),
