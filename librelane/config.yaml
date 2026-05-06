@@ -1,28 +1,97 @@
 meta:
-  version: 3
-  flow: Chip
-  substituting_steps:
-
-    # Disable KLayout DRC
-    #KLayout.DRC: null
-    #Checker.KLayoutDRC: null
-
-    # Disable KLayout antenna check
-    #KLayout.Antenna: null
-    #Checker.KLayoutAntenna: null
-
-    # Disable KLayout density check
-    #KLayout.Density: null
-    #Checker.KLayoutDensity: null
-
-    # Save time during development
-    # Enable for sign-off
-    #OpenROAD.IRDropReport: null
-    #Magic.DRC: null
-    #Checker.MagicDRC: null
-    #KLayout.XOR: null
-    #Netgen.LVS: null
-    #Checker.LVS: null
+    version: 3
+    flow: Chip
+    substituting_steps:
+        # Verilator.Lint: null
+        # Checker.Linttimingconstructs: null
+        # Checker.Linterrors: null
+        # Checker.Warnings: null
+        # Yosys.JsonHeader: null
+        # Yosys.Synthesis: null
+        # Checker.YosysUnmappedCells: null
+        # Checker.YosysSynthChecks: null
+        # Checker.NetlistAssignStatements: null
+        # OpenROAD.CheckSDCFiles: null
+        # OpenROAD.CheckMacroInstances: null
+        # OpenROAD.STAPrePNR: null
+        # OpenROAD.Floorplan: null
+        # OpenROAD.DumpRCValues: null
+        # ODB.SetPowerConnections: null
+        # OpenROAD.PadRing: null
+        # ODB.CheckMacroAntennaProperties: null
+        # ODB.ManualMacroPlacement: null
+        # OpenROAD.CutRows: null
+        # OpenROAD.TapEndcapInsertion: null
+        # ODB.AddPDNObstructions: null
+        # OpenROAD.GeneratePDN: null
+        # ODB.RemovePDNObstructions: null
+        # ODB.AddRoutingObstructions: null
+        # OpenROAD.GlobalPlacementSkipIO: null
+        # ODB.ApplyDEFTemplate: null
+        # OpenROAD.GlobalPlacement: null
+        # ODB.WriteVerilogHeader: null
+        # OpenROAD.STAMidPNR: null
+        # OpenROAD.RepairDesignPostGPL: null
+        # ODB.ManualGlobalPlacement: null
+        # OpenROAD.DetailedPlacement: null
+        # OpenROAD.CTS: null
+        # OpenROAD.ResizeRTimingPostCTS: null
+        # OpenROAD.GlobalRouting: null
+        # OpenROAD.CheckAntennas: null
+        # ODB.DiodesOnPorts: null
+        # OpenROAD.RepairAntennas: null
+        # OpenROAD.DetailedRouting: null
+        # ODB.RemoveRoutingObstructions: null
+        # ODB.ReportDisconnectedPins: null
+        # Checker.DisconnectedPins: null
+        # ODB.ReportWireLength: null
+        # Checker.WireLength: null
+        # OpenROAD.FillInsertion: null
+        # ODB.CellFrequencyTables: null
+        # OpenROAD.RCX: null
+        # OpenROAD.STAPostPNR: null
+        # # Save time during development
+        # # Enable for sign-off
+        # OpenROAD.IRDropReport: null
+        # Magic.StreamOut: null
+        # KLayout.StreamOut: null
+        # # Save time during development
+        # # Enable for sign-off
+        # KLayout.XOR: null
+        # Checker.XOR: null
+        # # Disable KLayout antenna check
+        # KLayout.Antenna: null
+        # # Disable KLayout antenna check
+        # Checker.KLayoutAntenna: null
+        # KLayout.SealRing: null
+        # KLayout.Filler: null
+        # # Disable KLayout density check
+        # KLayout.Density: null
+        # # Disable KLayout density check
+        # Checker.KLayoutDensity: null
+        # # Save time during development
+        # # Enable for sign-off
+        # Magic.DRC: null
+        # # Disable KLayout DRC
+        # KLayout.DRC: null
+        # # Save time during development
+        # # Enable for sign-off
+        # Checker.MagicDRC: null
+        # # Disable KLayout DRC
+        # Checker.KLayoutDRC: null
+        # Magic.SpiceExtraction: null
+        # Checker.IllegalOverlap: null
+        # # Save time during development
+        # # Enable for sign-off
+        # Netgen.LVS: null
+        # # Save time during development
+        # # Enable for sign-off
+        # Checker.LVS: null
+        # Checker.SetupViolations: null
+        # Checker.HoldViolations: null
+        # Checker.MaxSlewViolations: null
+        # Checker.MaxCapViolations: null
+        # Misc.ReportManufacturability: null
 
 DESIGN_NAME: chip_top
 
@@ -43,27 +112,27 @@ PAD_FAKE_CORNER_SITE_HEIGHT: 355
 
 # Provide merged GDS so KLayout XOR can check 3.3V std cell layouts
 EXTRA_GDS:
-- pdk_dir::libs.ref/gf180mcu_as_sc_mcu7t3v3/gf180mcu_as_sc_mcu7t3v3__merged.gds
+    - pdk_dir::libs.ref/gf180mcu_as_sc_mcu7t3v3/gf180mcu_as_sc_mcu7t3v3__merged.gds
 
 VERILOG_FILES:
-- dir::../src/chip_top.sv
-- dir::../src/chip_core.sv
-- dir::../src/soc.sv
-- dir::../src/spi_wrapper.sv
-- dir::../src/evt2_decoder.sv
-- dir::../src/input_fifo.sv
-- dir::../src/control_fsm.sv
-- dir::../src/voxel_binning.sv
-- dir::../src/voxel_bin_core.sv
-- dir::../src/voxel_mac_engine.sv
-- dir::../src/voxel_gesture_classifier.sv
-- dir::../src/selectable_debug.sv
-- dir::../src/gf180_sram_1r1w.sv
-- dir::../third_party/verilog_spi/spi_module.v
-- dir::../third_party/verilog_spi/spi2.v
-- dir::../third_party/verilog_spi/clock_divider.v
-- dir::../third_party/verilog_spi/pos_edge_det.v
-- dir::../third_party/verilog_spi/neg_edge_det.v
+    - dir::../src/chip_top.sv
+    - dir::../src/chip_core.sv
+    - dir::../src/soc.sv
+    - dir::../src/spi_wrapper.sv
+    - dir::../src/evt2_decoder.sv
+    - dir::../src/input_fifo.sv
+    - dir::../src/control_fsm.sv
+    - dir::../src/voxel_binning.sv
+    - dir::../src/voxel_bin_core.sv
+    - dir::../src/voxel_mac_engine.sv
+    - dir::../src/voxel_gesture_classifier.sv
+    - dir::../src/selectable_debug.sv
+    - dir::../src/gf180_sram_1r1w.sv
+    - dir::../third_party/verilog_spi/spi_module.v
+    - dir::../third_party/verilog_spi/spi2.v
+    - dir::../third_party/verilog_spi/clock_divider.v
+    - dir::../third_party/verilog_spi/pos_edge_det.v
+    - dir::../third_party/verilog_spi/neg_edge_det.v
 
 # Enable plugin for better SystemVerilog support
 # USE_SLANG: True
@@ -79,16 +148,16 @@ FALLBACK_SDC: dir::chip_top.sdc
 
 # Power / ground nets
 VDD_NETS:
-- VDD
+    - VDD
 GND_NETS:
-- VSS
+    - VSS
 
 # We need to add gf180mcu_fd_io__bi_24t
 # due to the unused Y output for output only pads
 IGNORE_DISCONNECTED_MODULES:
-- gf180mcu_fd_io__bi_24t
-- gf180mcu_ws_ip__id
-- gf180mcu_ws_ip__logo
+    - gf180mcu_fd_io__bi_24t
+    - gf180mcu_ws_ip__id
+    - gf180mcu_ws_ip__logo
 
 # Clock
 CLOCK_PORT: clk_PAD
@@ -138,21 +207,21 @@ ERROR_ON_MAGIC_DRC: False
 
 # Prevent false positive DRC errors in I/O cells
 MAGIC_GDS_FLATGLOB:
-# For contacts
-- "*_CDNS_*"
-# Foundry provided SRAMs
-- "*$$*"
-- "M1_N*"
-- "M1_P*"
-- "M2_M1*"
-- "M3_M2*"
-# nmos_5p0* / pmos_5p0* removed: those are 5V std cell internal subcells,
-# not present in the Avalon 3.3V library GDS.
-- "nmos_1p2*"
-- "pmos_1p2*"
-- "via1_*"
-- "ypass_gate*"
-- "G_ring_*"
+    # For contacts
+    - "*_CDNS_*"
+    # Foundry provided SRAMs
+    - "*$$*"
+    - "M1_N*"
+    - "M1_P*"
+    - "M2_M1*"
+    - "M3_M2*"
+    # nmos_5p0* / pmos_5p0* removed: those are 5V std cell internal subcells,
+    # not present in the Avalon 3.3V library GDS.
+    - "nmos_1p2*"
+    - "pmos_1p2*"
+    - "via1_*"
+    - "ypass_gate*"
+    - "G_ring_*"
 # The following patterns were internal subcell names of the foundry 5V SRAM GDS
 # (gf180mcu_fd_ip_sram). They are NOT needed for the OCD 3.3V SRAMs, which have
 # a different internal layout. If Magic DRC reports false positives inside the
@@ -165,171 +234,175 @@ MAGIC_GDS_FLATGLOB:
 # (DM.5_DM.7 and DM.4_DM.6). Dummy metal is moved to active
 # metal during the precheck.
 KLAYOUT_FILLER_OPTIONS:
-  Metal2_ignore_active: true
+    Metal2_ignore_active: true
 
 # Because we have multiple power pads for one power domain
 MAGIC_EXT_UNIQUE: notopports
 
 MACROS:
-  gf180mcu_ws_ip__id:
-    gds:
-      - dir::../ip/gf180mcu_ws_ip__id/gds/gf180mcu_ws_ip__id.gds
-    lef:
-      - dir::../ip/gf180mcu_ws_ip__id/lef/gf180mcu_ws_ip__id.lef
-    vh:
-      - dir::../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v
-    instances:
-      chip_id:
-        location: [26, 26]
-        orientation: N
+    gf180mcu_ws_ip__id:
+        gds:
+            - dir::../ip/gf180mcu_ws_ip__id/gds/gf180mcu_ws_ip__id.gds
+        lef:
+            - dir::../ip/gf180mcu_ws_ip__id/lef/gf180mcu_ws_ip__id.lef
+        vh:
+            - dir::../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v
+        instances:
+            chip_id:
+                location: [26, 26]
+                orientation: N
 
-  gf180mcu_ws_ip__logo:
-    gds:
-      - dir::../ip/gf180mcu_ws_ip__logo/gds/gf180mcu_ws_ip__logo.gds
-    lef:
-      - dir::../ip/gf180mcu_ws_ip__logo/lef/gf180mcu_ws_ip__logo.lef
-    vh:
-      - dir::../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
-    instances:
-      wafer_space_logo:
-        location: ["expr::$DIE_AREA[2] + -169.25", "expr::$DIE_AREA[3] + -169.25"]
-        orientation: N
+    gf180mcu_ws_ip__logo:
+        gds:
+            - dir::../ip/gf180mcu_ws_ip__logo/gds/gf180mcu_ws_ip__logo.gds
+        lef:
+            - dir::../ip/gf180mcu_ws_ip__logo/lef/gf180mcu_ws_ip__logo.lef
+        vh:
+            - dir::../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
+        instances:
+            wafer_space_logo:
+                location:
+                    [
+                        "expr::$DIE_AREA[2] + -169.25",
+                        "expr::$DIE_AREA[3] + -169.25",
+                    ]
+                orientation: N
 
-  # OCD 3.3V SRAMs — gf180mcu_ocd_ip_sram repo (RTimothyEdwards)
-  # Macro ports are identical to the 5V fd_ip_sram set; only the module
-  # names and address widths differ.  Files land under:
-  #   dependencies/pdks/gf180mcuD/libs.ref/gf180mcu_ocd_ip_sram/
-  # after running: make clone-ocd-sram
+    # OCD 3.3V SRAMs — gf180mcu_ocd_ip_sram repo (RTimothyEdwards)
+    # Macro ports are identical to the 5V fd_ip_sram set; only the module
+    # names and address widths differ.  Files land under:
+    #   dependencies/pdks/gf180mcuD/libs.ref/gf180mcu_ocd_ip_sram/
+    # after running: make clone-ocd-sram
 
-  gf180mcu_ocd_ip_sram__sram256x8m8wm1:
-    gds:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram256x8m8wm1.gds
-    lef:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram256x8m8wm1.lef
-    vh:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram256x8m8wm1.blackbox.v
-    lib:
-      # sram256x8 has a native TT corner — use it directly.
-      "*_tt_025C_3v30":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__tt_025C_3v30.lib
-      "*_ff_n40C_3v60":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ff_n40C_3v60.lib
-      "*_ss_125C_3v00":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ss_125C_3v00.lib
-    instances:
-      # input_fifo: 1 bank × 4 byte-lanes (col2, rows 0-3)
-      "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram":
-        location: [1094.6, 452]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram":
-        location: [1094.6, 696.93]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram":
-        location: [1094.6, 941.86]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram":
-        location: [1094.6, 1186.79]
-        orientation: N
-      # thresh_ram: 1 bank × 5 byte-lanes (col2, rows 4-8)
-      "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram":
-        location: [1094.6, 1431.72]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[1].sel.u_sram":
-        location: [1094.6, 1676.65]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[2].sel.u_sram":
-        location: [1094.6, 1921.58]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[3].sel.u_sram":
-        location: [1094.6, 2166.51]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[4].sel.u_sram":
-        location: [1094.6, 2411.44]
-        orientation: N
+    gf180mcu_ocd_ip_sram__sram256x8m8wm1:
+        gds:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram256x8m8wm1.gds
+        lef:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram256x8m8wm1.lef
+        vh:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram256x8m8wm1.blackbox.v
+        lib:
+            # sram256x8 has a native TT corner — use it directly.
+            "*_tt_025C_3v30":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__tt_025C_3v30.lib
+            "*_ff_n40C_3v60":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ff_n40C_3v60.lib
+            "*_ss_125C_3v00":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ss_125C_3v00.lib
+        instances:
+            # input_fifo: 1 bank × 4 byte-lanes (col2, rows 0-3)
+            "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram":
+                location: [1094.6, 452]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram":
+                location: [1094.6, 696.93]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram":
+                location: [1094.6, 941.86]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram":
+                location: [1094.6, 1186.79]
+                orientation: N
+            # thresh_ram: 1 bank × 5 byte-lanes (col2, rows 4-8)
+            "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram":
+                location: [1094.6, 1431.72]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[1].sel.u_sram":
+                location: [1094.6, 1676.65]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[2].sel.u_sram":
+                location: [1094.6, 1921.58]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[3].sel.u_sram":
+                location: [1094.6, 2166.51]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[4].sel.u_sram":
+                location: [1094.6, 2411.44]
+                orientation: N
 
-  gf180mcu_ocd_ip_sram__sram512x8m8wm1:
-    gds:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram512x8m8wm1.gds
-    lef:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram512x8m8wm1.lef
-    vh:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram512x8m8wm1.blackbox.v
-    lib:
-      # sram512x8 has no TT corner lib; use ff_n40C as a conservative substitute.
-      "*_tt_025C_3v30":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
-      "*_ff_n40C_3v60":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
-      "*_ss_125C_3v00":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ss_125C_3v00.lib
+    gf180mcu_ocd_ip_sram__sram512x8m8wm1:
+        gds:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram512x8m8wm1.gds
+        lef:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram512x8m8wm1.lef
+        vh:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram512x8m8wm1.blackbox.v
+        lib:
+            # sram512x8 has no TT corner lib; use ff_n40C as a conservative substitute.
+            "*_tt_025C_3v30":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
+            "*_ff_n40C_3v60":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
+            "*_ss_125C_3v00":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ss_125C_3v00.lib
 
-  gf180mcu_ocd_ip_sram__sram1024x8m8wm1:
-    gds:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.gds
-    lef:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.lef
-    vh:
-      - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.blackbox.v
-    lib:
-      # sram1024x8 has no TT corner lib; use ff_n40C as a conservative substitute.
-      "*_tt_025C_3v30":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
-      "*_ff_n40C_3v60":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
-      "*_ss_125C_3v00":
-        - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ss_125C_3v00.lib
-    instances:
-      # weight_ram[0..3]: 4 RAMs × 2 banks — col0 (x=452) rows 0-7
-      "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 452]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 987.81]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 1523.62]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 2059.43]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 2595.24]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 3131.05]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 3666.86]
-        orientation: N
-      "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-        location: [452, 4202.67]
-        orientation: N
-      # feature_ram: 2 banks × 2 byte-lanes — col1 (x=773.3) rows 0-3
-      "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-        location: [773.3, 452]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
-        location: [773.3, 987.81]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-        location: [773.3, 1523.62]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
-        location: [773.3, 2059.43]
-        orientation: N
-      # counter_mem: 2 banks × 2 byte-lanes — col1 (x=773.3) rows 4-7
-      "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-        location: [773.3, 2595.24]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
-        location: [773.3, 3131.05]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-        location: [773.3, 3666.86]
-        orientation: N
-      "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
-        location: [773.3, 4202.67]
-        orientation: N
+    gf180mcu_ocd_ip_sram__sram1024x8m8wm1:
+        gds:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.gds
+        lef:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.lef
+        vh:
+            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.blackbox.v
+        lib:
+            # sram1024x8 has no TT corner lib; use ff_n40C as a conservative substitute.
+            "*_tt_025C_3v30":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
+            "*_ff_n40C_3v60":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
+            "*_ss_125C_3v00":
+                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ss_125C_3v00.lib
+        instances:
+            # weight_ram[0..3]: 4 RAMs × 2 banks — col0 (x=452) rows 0-7
+            "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 452]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 987.81]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 1523.62]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 2059.43]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 2595.24]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 3131.05]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 3666.86]
+                orientation: N
+            "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
+                location: [452, 4202.67]
+                orientation: N
+            # feature_ram: 2 banks × 2 byte-lanes — col1 (x=773.3) rows 0-3
+            "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
+                location: [773.3, 452]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
+                location: [773.3, 987.81]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
+                location: [773.3, 1523.62]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
+                location: [773.3, 2059.43]
+                orientation: N
+            # counter_mem: 2 banks × 2 byte-lanes — col1 (x=773.3) rows 4-7
+            "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
+                location: [773.3, 2595.24]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
+                location: [773.3, 3131.05]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
+                location: [773.3, 3666.86]
+                orientation: N
+            "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
+                location: [773.3, 4202.67]
+                orientation: N
 # Halo size around macros while cutting rows.
 # Workaround for: https://github.com/The-OpenROAD-Project/OpenROAD/issues/8868
 FP_MACRO_HORIZONTAL_HALO: 10
@@ -342,11 +415,11 @@ PDN_CFG: dir::pdn_cfg.tcl
 # Make sure netgen doesn't create 'no_connect' nets
 # Not needed since netgen 1.5.303
 LVS_FLATTEN_CELLS:
-- gf180mcu_ws_ip__id
-- gf180mcu_ws_ip__logo
+    - gf180mcu_ws_ip__id
+    - gf180mcu_ws_ip__logo
 
 # gf180mcu_ws_ip__id/logo has no ports and components
 # therefore make it an abstract cell in the layout
 MAGIC_EXT_ABSTRACT_CELLS:
-- gf180mcu_ws_ip__id
-- gf180mcu_ws_ip__logo
+    - gf180mcu_ws_ip__id
+    - gf180mcu_ws_ip__logo
