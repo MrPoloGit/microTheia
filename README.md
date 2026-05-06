@@ -179,7 +179,7 @@ This project uses an SPI module from:
 
 Licensed under the GNU LGPL v2.1.
 
-The only functional change we have made in spi_module.v was adding a non-master fallback in the generate block; previously SCLK_OUT/SS_OUT were only assigned inside if (SPI_MASTER), and now there is an else branch that forces safe defaults when SPI_MASTER == 0 (SCLK_OUT = 1'b0, SS_OUT = 1'b1).   
+The functional change we have made in spi_module.v was adding a non-master fallback in the generate block; previously SCLK_OUT/SS_OUT were only assigned inside if (SPI_MASTER), and now there is an else branch that forces safe defaults when SPI_MASTER == 0 (SCLK_OUT = 1'b0, SS_OUT = 1'b1). There is also clean up and verilator lint flags to reduce lint errors.
 
 ## Precheck
 
