@@ -440,9 +440,9 @@ module voxel_bin_core #(
         .score_D       (score_D),
         .fifo_in       (evt_word),
         .fifo_out      (fifo_out_data),
-        /* verilator lint_off PINMISSING */
+        /* verilator lint_off PINCONNECTEMPTY */
         .fsm_debug_bus (),
-        /* verilator lint_off PINMISSING */
+        /* verilator lint_off PINCONNECTEMPTY */
         .debug_select  (debug_page_sel)
     );
 
