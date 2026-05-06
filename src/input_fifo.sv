@@ -70,7 +70,7 @@ module input_fifo #(
 
     gf180_sram_1r1w #(
         .width_p(DATA_WIDTH),
-        .depth_p(DEPTH_W)
+        .depth_p(depth_p)
     ) u_fifo_mem (
         .clk_i      (clk_i),
         .reset_i    (reset_i),
