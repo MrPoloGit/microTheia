@@ -7,15 +7,15 @@ module chip_core #(
     parameter NUM_INPUT_PADS,
     parameter NUM_BIDIR_PADS,
     parameter NUM_ANALOG_PADS
-    )(
+)(
     `ifdef USE_POWER_PINS
     inout  wire VDD,
     inout  wire VSS,
     `endif
-    
+
     input  wire clk,       // clock
     input  wire rst_n,     // reset (active low)
-    
+
     //the way these work is for each bus, the indices of each wire all correspond to 1 pin and its configuration settings
     // example for the input bus: input_in[0] is the data in, input_pu[0] is the pull up configuration and input_pd[0] is the pull down config all for input-only pin 0
     // bidirectional pins have more configuration settings
@@ -55,14 +55,14 @@ module chip_core #(
     assign bidir_oe[39]   = 1'b1;
      // pins 0 and 1 are assigned after soc module along with alternate mux pin logic
     assign bidir_out[5:2] = '0; // reserved pins driven to 0
-   
+
 
     assign bidir_cs = '0; //not relevant since all of our bidirects are output
     assign bidir_sl = '0; //slew rate. fast is 0, using as default for all. maybe could set debug pins to slow slew rate?
     assign bidir_ie = '0; //input disabled for all bidirectional pins
     assign bidir_pu = '0; //pull ups diasbled for all output
     assign bidir_pd = '0; //pull downs disabled for all output
-    
+
     logic _unused;
     assign _unused = &bidir_in;
     //end pin config
@@ -97,7 +97,7 @@ module chip_core #(
     //assigning spi ready and debug bus to pins according to pinout chart, currently do not support alternating these to a different pinout
     assign bidir_out[39] = spi_ready;
     assign bidir_out [37:6] = debug_bus;
-    
+
     // sync ALT_INPUT_MODE pin, then detect rising edge
     logic input_in_8_sync_0;
     logic input_in_8_sync_1;
@@ -123,13 +123,13 @@ module chip_core #(
         end
         else if(alt_mode_trigger) begin
             alt_select <= ~alt_select;
-        end       
-    end 
+        end
+    end
     // muxing input pins and spi interface, using alt_select signal
     assign MOSI_wire = alt_select ? input_in[3] : input_in[6];
     assign SCLK_wire = alt_select ? input_in[2] : input_in[5];
     assign CS_wire   = alt_select ? input_in[4] : input_in[7];
-         
+
     //muxing MISO to output pins, and disabling output for inactive ports
     assign bidir_out[0] =  !alt_select ? MISO_wire : 1'b0;
     assign bidir_out[1] = alt_select ? MISO_wire : 1'b0;
