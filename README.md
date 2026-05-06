@@ -179,6 +179,8 @@ This project uses an SPI module from:
 
 Licensed under the GNU LGPL v2.1.
 
+The only functional change we have made in spi_module.v was adding a non-master fallback in the generate block; previously SCLK_OUT/SS_OUT were only assigned inside if (SPI_MASTER), and now there is an else branch that forces safe defaults when SPI_MASTER == 0 (SCLK_OUT = 1'b0, SS_OUT = 1'b1).   
+
 ## Precheck
 
 To check whether our design is suitable for manufacturing, run the [gf180mcu-precheck](https://github.com/wafer-space/gf180mcu-precheck) with the layout.
