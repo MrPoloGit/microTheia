@@ -6,7 +6,7 @@
 //TODO: remove deprecated ports from voxel_bin_core module that are not present here
 //using the third party SPI introduces some extra latency cycles because it is strongly transaction oriented
 module soc #(
-    parameter int CLK_FREQ_HZ          = 32_000_000,
+    parameter int CLK_FREQ_HZ          = 64_000_000,
     parameter int WINDOW_MS            = 1000,
     parameter int GRID_SIZE            = 16,
     parameter int NUM_BINS             = 8,
@@ -28,7 +28,7 @@ module soc #(
     input  logic clk,
     input  logic rst,
     input  logic MOSI, //master out slave in (from off chip to in chip)
-    input  logic SCLK, //no CDC or DLL needed if SCLK sufficiently slower than clk. apparently chip clock must be 4x fast minimum (32 MHz chip, 8 MHz sclk should work)
+    input  logic SCLK, //no CDC or DLL needed if SCLK sufficiently slower than clk. system default is 64 MHz chip clock with 32 MHz SCLK (2x ratio)
     input  logic CS, // aka SS, signals a transaction is occuring or not
     output logic MISO, //master in slave out (from in chip to off chip)
     output logic [31:0] debug_bus,

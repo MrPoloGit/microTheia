@@ -71,7 +71,7 @@ module chip_core #(
     logic [31:0] debug_bus;
 
     soc #(
-        .CLK_FREQ_HZ(32_000_000),
+        .CLK_FREQ_HZ(64_000_000),
         .WINDOW_MS(1000),
         .GRID_SIZE(16),
         .NUM_BINS(8),
@@ -88,7 +88,7 @@ module chip_core #(
         .clk(clk),
         .rst(!rst_n), //active low here and then no downstream module need to be adjusted
         .MOSI(MOSI_wire), //master out slave in (from off chip to in chip)
-        .SCLK(SCLK_wire), //no CDC or DLL needed if SCLK sufficiently slower than clk. apparently chip clock must be 4x fast minimum (32 MHz chip, 8 MHz sclk should work)
+        .SCLK(SCLK_wire), //no CDC or DLL needed if SCLK sufficiently slower than clk. system default is 64 MHz chip clock with 32 MHz SCLK (2x ratio)
         .CS(CS_wire), // aka SS, signals a transaction is occuring or not
         .MISO(MISO_wire), //master in slave out (from in chip to off chip)
         .debug_bus(debug_bus), //bus from debug mux, pages selectable via commands over spi

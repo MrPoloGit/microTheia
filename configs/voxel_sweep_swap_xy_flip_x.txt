@@ -1,4 +1,4 @@
-CLK_FREQ_HZ         = 12_000_000
+CLK_FREQ_HZ         = 64_000_000
 BAUD_RATE           = 1_000_000
 WINDOW_MS           = 1000
 
