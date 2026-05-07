@@ -8,7 +8,7 @@ Make sure Git and Git LFS are installed.
 
 ```bash
 git clone git@github.com:dolphin-530/microTheia.git
-cd group-g
+cd microTheia
 git submodule update --init --recursive
 make clone-pdk
 make clone-avalon-pdk

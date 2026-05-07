@@ -91,7 +91,7 @@ class GestureClassifierModel:
 
 
 async def setup(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
     dut.rst.value              = 1
     dut.scores_flat.value      = 0
     dut.scores_valid.value     = 0

@@ -26,7 +26,7 @@ async def wait_cycles(dut, n):
 async def test_full_boot_sequence(dut):
     """Normal boot → load → wait → done → run"""
 
-    cocotb.start_soon(Clock(dut.clk, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
 
     await reset_dut(dut)
 
@@ -57,7 +57,7 @@ async def test_full_boot_sequence(dut):
 async def test_bypass_mode(dut):
     """Test evt_ld_bypass skips wait"""
 
-    cocotb.start_soon(Clock(dut.clk, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.boot_req_i.value = 1
@@ -76,7 +76,7 @@ async def test_bypass_mode(dut):
 async def test_reload_from_run(dut):
     """Test reload path from RUN"""
 
-    cocotb.start_soon(Clock(dut.clk, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.boot_req_i.value = 1
@@ -105,7 +105,7 @@ async def test_reload_from_run(dut):
 async def test_debug_interrupt(dut):
     """Debug request should override everything"""
 
-    cocotb.start_soon(Clock(dut.clk, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.boot_req_i.value = 1

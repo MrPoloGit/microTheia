@@ -111,7 +111,7 @@ class RamModel:
 
 async def setup(dut):
     configure_from_dut(dut)
-    cocotb.start_soon(Clock(dut.clk, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
     dut.rst.value           = 1
     dut.start.value         = 0
     dut.feature_data.value  = 0

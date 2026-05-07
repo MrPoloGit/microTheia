@@ -9,7 +9,7 @@
 // selected by weight_wr_class_i.
 
 module voxel_bin_core #(
-    parameter int CLK_FREQ_HZ       = 12_000_000,
+    parameter int CLK_FREQ_HZ       = 64_000_000,
     parameter int WINDOW_MS         = 1000,
     parameter int GRID_SIZE         = 16,
     parameter int NUM_BINS          = 8,

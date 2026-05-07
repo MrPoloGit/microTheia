@@ -14,19 +14,19 @@ from cocotb.triggers import (
 
 MODULE = os.environ.get("TOPLEVEL")
 
-CHIP_PERIOD_NS = 31.25  # 32 MHz
+CHIP_PERIOD_PS = 15626  # ~64 MHz (system default; even ps required by cocotb)
 DATA_WIDTH = 32
 
 # Manual SCLK. Trying two real "clock" signals in cocotb was causing problems.
-# I set default test to chip at 32 MHz and SCLk at 8MHz
+# System default: chip at 64 MHz, SCLK at 32 MHz (2x ratio).
 # Each SCLK half-cycle is this many chip clk cycles.
-# SCLK period = 2 * SPI_HALF_CHIP_CYCLES * CHIP_PERIOD_NS
-# With 4: SCLK ~= 4 MHz.
-SPI_HALF_CHIP_CYCLES_DEFAULT = 4
+# SCLK period = 2 * SPI_HALF_CHIP_CYCLES * CHIP_PERIOD_PS
+# With 1: SCLK = 32 MHz at 64 MHz chip clock.
+SPI_HALF_CHIP_CYCLES_DEFAULT = 1
 
 
 async def setup(dut):
-    cocotb.start_soon(Clock(dut.clk, CHIP_PERIOD_NS, "ns").start())
+    cocotb.start_soon(Clock(dut.clk, CHIP_PERIOD_PS, "ps").start())
 
     await NextTimeStep()
 
@@ -650,8 +650,8 @@ async def test_spi_wrapper_duplex_sanity(dut):
     )
 
     # -------------------------------------------------
-    # 10. Faster SPI timing still safely sampled by clk
-    # half_cycles=2 means SCLK half-period is 2 clk cycles.
+    # 10. Slower SPI timing variant (vs the 32 MHz default)
+    # half_cycles=2 means SCLK half-period is 2 clk cycles (16 MHz SCLK at 64 MHz chip).
     # -------------------------------------------------
     await run_duplex_case(
         dut,

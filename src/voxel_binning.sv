@@ -9,7 +9,7 @@
 // Accumulate (ST_ACCUM) uses a 2-cycle read-modify-write pipeline:
 //   Cycle N   : issue SRAM read for event address; block new events (event_ready=0).
 //   Cycle N+1 : SRAM Q is old counter; write back (old+1, saturating); accept next event.
-// Throughput: 1 event per 2 cycles (6 MHz at 12 MHz clock — sufficient for GenX320).
+// Throughput: 1 event per 2 cycles (32 MHz at 64 MHz clock — sufficient for GenX320).
 //
 // Readout (ST_READOUT) issues sequential SRAM reads one cycle ahead; all output
 // signals (readout_valid, readout_data, readout_index, readout_last) are registered

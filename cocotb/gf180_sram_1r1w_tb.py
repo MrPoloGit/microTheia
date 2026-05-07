@@ -19,7 +19,7 @@ DATA_MASK = (1 << WIDTH_P) - 1
 
 
 async def setup(dut):
-    cocotb.start_soon(Clock(dut.clk_i, 10, "ns").start())
+    cocotb.start_soon(Clock(dut.clk_i, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
     dut.reset_i.value  = 1
     dut.wr_valid_i.value = 0
     dut.wr_data_i.value  = 0

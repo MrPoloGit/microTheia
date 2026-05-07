@@ -42,13 +42,14 @@ slot     = os.getenv("SLOT", "1x1")
 hdl_toplevel = "chip_top"
 
 # ── Timing ────────────────────────────────────────────────────────────────────
-CLK_FREQ_HZ    = int(os.getenv("CLK_FREQ_HZ", "32000000"))
-CHIP_PERIOD_PS = int(round(1_000_000_000_000 / CLK_FREQ_HZ))
+CLK_FREQ_HZ    = int(os.getenv("CLK_FREQ_HZ", "64000000"))
+_raw_ps        = int(round(1_000_000_000_000 / CLK_FREQ_HZ))
+CHIP_PERIOD_PS = _raw_ps + (_raw_ps % 2)   # cocotb Clock requires an even ps period
 DATA_WIDTH     = 32
 
 # Each SCLK half-period expressed in chip-clock cycles.
-# 2 cycles → 8 MHz SCLK at 32 MHz chip clock.
-SPI_HALF = int(os.getenv("SPI_HALF_CYCLES", "2"))
+# 1 cycle → 32 MHz SCLK at 64 MHz chip clock.
+SPI_HALF = int(os.getenv("SPI_HALF_CYCLES", "1"))
 
 # ── Pin map ───────────────────────────────────────────────────────────────────
 # input_PAD indices
@@ -139,17 +140,21 @@ def _bidir_bit(dut, idx):
 
 
 async def _wait_spi_ready(dut, max_cycles=5000):
-    # Read from the internal chip_core signal — avoids the Z-bit problem
-    # that makes int(dut.bidir_PAD.value) always throw on the inout bus.
+    """
+    Pin-level read of spi_ready (exposed on bidir_PAD[39]).
+
+    Reading via the pin (instead of the internal i_chip_core.spi_ready signal)
+    validates the full output path: chip_core's `assign bidir_out[39] = spi_ready`,
+    `bidir_oe[39] = 1'b1`, the IO pad model, and the inout bidir_PAD wire.
+    A bit-mapping bug in chip_core.sv would silently break the chip in
+    production but go unnoticed if we read the internal signal.
+    """
     for n in range(max_cycles):
         await RisingEdge(dut.clk_PAD)
-        try:
-            if int(dut.i_chip_core.spi_ready.value) == 1:
-                dut._log.info(f"spi_ready asserted after {n} cycles")
-                return
-        except Exception:
-            pass
-    raise AssertionError("spi_ready never asserted after reset")
+        if _bidir_bit(dut, BPIN_SPI_READY) == 1:
+            dut._log.info(f"spi_ready asserted on bidir_PAD[39] after {n} cycles")
+            return
+    raise AssertionError("spi_ready never asserted on bidir_PAD[39] after reset")
 
 
 def _read_bidir_bit(dut, idx):
@@ -158,11 +163,22 @@ def _read_bidir_bit(dut, idx):
 
 
 def _read_debug_bus(dut):
-    """Return debug_bus[31:0] from the internal chip_core signal."""
-    try:
-        return int(dut.i_chip_core.debug_bus.value)
-    except Exception:
-        return 0
+    """
+    Pin-level read of debug_bus (exposed on bidir_PAD[37:6]).
+
+    Same rationale as _wait_spi_ready: reading the pins instead of the
+    internal i_chip_core.debug_bus signal validates the full output path
+    including bit-mapping, output enables, and pad models.
+    """
+    s   = _bidir_str(dut)                # 40 chars, MSB-first (s[0] = bit 39)
+    bus = 0
+    # bidir_PAD[37:6] → 32 bits of debug_bus.  bit 6 = LSB of debug_bus.
+    for i in range(32):
+        idx = 6 + i                      # pin index 6..37
+        c   = s[39 - idx]
+        if c == '1':
+            bus |= (1 << i)
+    return bus
 
 
 async def _startup(dut):
@@ -177,12 +193,18 @@ async def _startup(dut):
 # ── SPI streaming ─────────────────────────────────────────────────────────────
 
 async def _spi_stream(dut, pins, words, *, alt=False,
-                      capture_miso=False, half=SPI_HALF, tag="spi"):
+                      capture_miso=False, half=SPI_HALF, inter_gap=4,
+                      progress_every=0, tag="spi"):
     """
     Mode-0 SPI stream. CS stays low for the whole burst.
 
     alt=False uses input_PAD[5,6,7] / bidir_PAD[0].
     alt=True  uses input_PAD[2,3,4] / bidir_PAD[1].
+
+    progress_every: emit a progress log every N words.  0 = no progress logs.
+    Used by long EVT2 recording streams (~249K words) so the user can see the
+    sim is making progress — without breaking the CS-held-low invariant of a
+    real sensor burst.
     """
     p_sclk  = PIN_ALT_SCLK if alt else PIN_DEF_SCLK
     p_mosi  = PIN_ALT_MOSI if alt else PIN_DEF_MOSI
@@ -231,11 +253,15 @@ async def _spi_stream(dut, pins, words, *, alt=False,
             miso_words.append(miso_word)
 
         # Inter-word gap: CS stays low, SCLK stays low
-        await ClockCycles(dut.clk_PAD, 4)
+        await ClockCycles(dut.clk_PAD, inter_gap)
         if widx < len(words) - 1:
             nxt = int(words[widx + 1]) & 0xFFFFFFFF
             pins.set(p_mosi, (nxt >> (DATA_WIDTH - 1)) & 1)
             pins.drive(dut)
+
+        if progress_every and (widx + 1) % progress_every == 0:
+            dut._log.info(f"{tag}: streamed {widx + 1}/{len(words)} words "
+                          f"(CS held low) …")
 
     # Deassert CS
     await ClockCycles(dut.clk_PAD, 4)
@@ -416,6 +442,550 @@ async def test_alt_input_mode_toggle_back(dut):
     )
 
     dut._log.info("PASS: double toggle restores default SPI interface")
+
+
+# ── Classification test ───────────────────────────────────────────────────────
+# Streams real EVT2 gesture recordings through chip_top input pins, boots the
+# chip with learned weights/thresholds over SPI, then asserts that the on-chip
+# classifier produces the correct gesture label for each of the 4 recordings.
+# This is the top-level proof that the fabricated chip will classify correctly.
+
+import struct
+
+_REPO_ROOT    = Path(__file__).resolve().parents[1]
+_GRID_SIZE    = 16
+_READOUT_BINS = 8
+_NUM_CLASSES  = 4
+_FEAT_COUNT   = _GRID_SIZE * _GRID_SIZE * _READOUT_BINS   # 2048
+
+# Programmable bin length — added by commit c1146c3.
+#
+# voxel_binning.sv defaults bin_duration_ts to 34'd125000 (125 ms) on reset
+# and overrides it ONLY when the EVT2 decoder asserts bin_length_valid with a
+# non-zero bin_length_us.  evt2_decoder.sv accepts the value as two 17-bit
+# halves over BIN_LENGTH_U=0x5 / BIN_LENGTH_L=0x6 opcodes during evt_ld_en.
+#
+# Why we now program it explicitly even when using the default:
+#   1. Exercises the new opcode path through SPI → FIFO → decoder → binning.
+#   2. Documents the bin length in the test instead of relying on an RTL
+#      default that could change.
+#   3. Makes the test resilient to future RTL refactors that might lower
+#      DEFAULT_BIN_LENGTH (would otherwise silently break flush-event spacing).
+#
+# Override via env var:  BIN_LENGTH_US=50000  → 50 ms bins, 0.4 s window.
+BIN_LENGTH_US = int(os.getenv("BIN_LENGTH_US", "125000"))
+
+GESTURE_NAMES = {0: "Down", 1: "Left", 2: "Right", 3: "Up"}
+
+# Expected gesture index for each test file (order matches _resolve_bin_files())
+_EXPECTED_CLASS = {0: 0, 1: 1, 2: 2, 3: 3}
+
+# ── EVT2 word builders ────────────────────────────────────────────────────────
+
+def _w_weight(weight, feat_addr, class_id):
+    return (0x2 << 28) | ((weight & 0xFF) << 20) | ((feat_addr & 0x7FF) << 9) | ((class_id & 0x3) << 7)
+
+def _w_thresh_upper(val, addr):
+    return (0x3 << 28) | (((val >> 18) & 0x3FFFF) << 10) | ((addr & 0x7) << 7)
+
+def _w_thresh_lower(val, addr):
+    return (0x4 << 28) | ((val & 0x3FFFF) << 10) | ((addr & 0x7) << 7)
+
+def _w_bin_length_upper(val):
+    """
+    Upper 17 bits of programmable bin length (µs).
+
+    Layout (matches evt2_decoder.sv BIN_LENGTH_U handler at line 206):
+        [31:28] type = 0x5
+        [27:17] don't care
+        [16:0]  upper 17 bits of bin_length_us (latched into bin_length_reg)
+    """
+    return (0x5 << 28) | ((int(val) >> 17) & 0x1FFFF)
+
+def _w_bin_length_lower(val):
+    """
+    Lower 17 bits of bin length.  When this word is decoded the full 34-bit
+    value {bin_length_reg, evt_word[16:0]} is registered and bin_length_valid
+    pulses, signalling voxel_binning to update bin_duration_ts.
+    """
+    return (0x6 << 28) | (int(val) & 0x1FFFF)
+
+def _w_reads_done():
+    return 0xF << 28
+
+# ── File helpers ──────────────────────────────────────────────────────────────
+
+def _load_weights():
+    weights = []
+    for c in range(_NUM_CLASSES):
+        path = _REPO_ROOT / f"weights/{_FEAT_COUNT}weights_q8_c{c}.mem"
+        vals = []
+        if path.exists():
+            for line in path.read_text(encoding="ascii").splitlines():
+                line = line.strip()
+                if line and not line.startswith("//"):
+                    try:
+                        vals.append(int(line, 16))
+                    except ValueError:
+                        vals.append(0)
+        else:
+            raise FileNotFoundError(f"Weight file missing: {path}")
+        while len(vals) < _FEAT_COUNT:
+            vals.append(0)
+        weights.append(vals[:_FEAT_COUNT])
+    return weights
+
+def _load_thresholds():
+    path = _REPO_ROOT / "weights/thresholds.mem"
+    vals = []
+    if path.exists():
+        for line in path.read_text(encoding="ascii").splitlines():
+            line = line.strip()
+            if line and not line.startswith("//"):
+                try:
+                    vals.append(int(line, 16))
+                except ValueError:
+                    vals.append(0)
+    while len(vals) < 2 * _NUM_CLASSES:
+        vals.append(0)
+    return vals[:2 * _NUM_CLASSES]
+
+def _build_program_words(weights, thresholds, bin_length_us=BIN_LENGTH_US):
+    """
+    Build the SPI programming stream (sent after BOOT_REQ once evt_ld_en is high).
+
+    Order:
+        1. weights      — per-class feature weights into the MAC SRAM
+        2. thresholds   — class + diff thresholds (upper / lower halves)
+        3. bin length   — programs voxel_binning's bin_duration_ts (NEW)
+        4. READS_DONE   — signals the decoder that programming is complete
+
+    The bin-length pair is sent *before* READS_DONE so bin_length_valid pulses
+    while evt_ld_en is still high; voxel_binning latches it into
+    bin_duration_ts and from that point all rollovers are spaced exactly
+    bin_length_us apart (line 323 of voxel_binning.sv:
+    `bin_start_ts <= bin_start_ts + bin_duration_ts`).
+    """
+    words = []
+    for c in range(_NUM_CLASSES):
+        for a in range(_FEAT_COUNT):
+            words.append(_w_weight(weights[c][a], a, c))
+    for a, v in enumerate(thresholds):
+        words.append(_w_thresh_upper(v, a))
+        words.append(_w_thresh_lower(v, a))
+    # Program bin length last so it lands while evt_ld_en is still high.
+    words.append(_w_bin_length_upper(bin_length_us))
+    words.append(_w_bin_length_lower(bin_length_us))
+    words.append(_w_reads_done())
+    return words
+
+def _read_bin(path):
+    data = Path(path).read_bytes()
+    if data.startswith(b"version https://git-lfs.github.com/spec/v1"):
+        raise RuntimeError(f"{path} is a Git LFS pointer — run 'git lfs pull'")
+    n = len(data) // 4
+    words = list(struct.unpack_from(f"<{n}I", data, 0))
+
+    # Sanity check: TIME_HIGH must be monotonically non-decreasing.
+    #
+    # We deliberately do NOT check CD-event timestamps for monotonicity.
+    # The GenX320's parallel pixel-array readout emits events from different
+    # pixels in arbitrary order within a single TIME_HIGH block (≤ 64 µs
+    # spread).  Real recordings routinely contain small backwards CD deltas;
+    # this is normal sensor behavior, not corruption.  The chip tolerates it
+    # because (acc_event_ts - bin_start_ts) is compared against the 125 ms
+    # bin duration — within-block reordering (≤ 64 µs) is two orders of
+    # magnitude smaller than a bin boundary, so no spurious rollover fires.
+    #
+    # Checking TIME_HIGH monotonicity is sufficient to catch:
+    #   • LFS truncation (file size mismatch caught earlier; mid-event truncation
+    #     would leave dangling bytes — caught by `len(data) // 4` losing data)
+    #   • Wrong endianness / byte-swap (would scramble type and ts bits, producing
+    #     bizarre TIME_HIGH values)
+    #   • Concatenation of recordings without re-basing (TIME_HIGH would reset
+    #     to 0 at the seam — definitely backwards)
+    last_th     = -1
+    last_th_idx = -1
+    for idx, w in enumerate(words):
+        if (w >> 28) == 0x8:                                # TIME_HIGH
+            th = w & 0x0FFFFFFF
+            if th < last_th:
+                raise RuntimeError(
+                    f"{path}: TIME_HIGH went backwards at word {idx}: "
+                    f"th={th} < prev th={last_th} (prev word #{last_th_idx}). "
+                    "File is corrupt or recordings were concatenated."
+                )
+            last_th     = th
+            last_th_idx = idx
+    return words
+
+def _append_flush_events(words, bin_length_us=BIN_LENGTH_US):
+    """
+    Add synthetic TIME_HIGH+CD_OFF pairs to drain the voxel binning pipeline.
+
+    Each pair advances the decoder's reconstructed timestamp by exactly
+    `bin_length_us`, which matches `bin_duration_ts` inside voxel_binning.
+    The first event whose timestamp crosses the next bin boundary triggers a
+    rollover (voxel_binning.sv:188 — `(acc_event_ts - bin_start_ts) >=
+    bin_duration_ts`), so READOUT_BINS+2=10 spaced events guarantee enough
+    rollovers to flush every bin in the ring buffer regardless of the
+    programmed bin length.
+
+    NOTE: this MUST track BIN_LENGTH_US.  If the chip is programmed with a
+    50 ms bin length but flush events are spaced 125 ms apart, each flush
+    event would cross *multiple* bin boundaries and the chip would have to
+    process queued rollovers — which is fine for correctness but wastes
+    drain time.  Conversely, if flush spacing is too small, rollovers never
+    trigger and stale event counts persist into the next recording.
+    """
+    last_th = 0
+    for w in words:
+        if (w >> 28) == 0x8:
+            last_th = w & 0x0FFFFFFF
+    for i in range(1, _READOUT_BINS + 2):
+        ts_us  = last_th * 64 + i * bin_length_us
+        th_val = (ts_us >> 6) & 0x0FFFFFFF
+        ts_lsb = ts_us & 0x3F
+        words.append((0x8 << 28) | th_val)
+        words.append((ts_lsb << 22) | (160 << 11) | 160)
+    return words
+
+def _resolve_bin_files():
+    test_set = _REPO_ROOT / "EVT2_gesture_set" / "test_set"
+    names = ["wave_down_sun_test1.bin", "wave_left_sun_test1.bin",
+             "wave_right_sun_test1.bin", "wave_up_sun_test1.bin"]
+    return [test_set / n for n in names]
+
+# ── Classification-test helpers ───────────────────────────────────────────────
+
+def _sig(dut, path):
+    """Read an internal signal by dotted path; return int or None."""
+    try:
+        obj = dut
+        for part in path.split("."):
+            obj = getattr(obj, part)
+        return int(obj.value)
+    except Exception:
+        return None
+
+# Time from end of BOOT_REQ word to evt_ld_en going high.  Driven by
+# control_fsm.sv:PWR_WAIT_CYCLES (default 1024) + 1 cycle for the FSM to
+# register boot_req_i + 1 cycle for the LD_OPEN→evt_ld_en register update.
+# 1100 gives ~75 cycles of slack — fixed wait, no internal-signal access.
+# This matches what a host MCU would do (no GPIO is connected to evt_ld_en).
+_EVT_LD_EN_WAIT_CYCLES = 1100
+
+
+async def _boot_chip_top(dut, pins, weights, thresholds):
+    """
+    Boot the chip over SPI: BOOT_REQ → fixed wait for boot FSM → program words.
+
+    Pin-only protocol:
+      1. Send BOOT_REQ word over SPI (input_PAD pins).
+      2. Wait fixed _EVT_LD_EN_WAIT_CYCLES — this matches what a real host
+         MCU would do, since evt_ld_en is internal and not bonded out.
+      3. Stream weights / thresholds / bin_length / READS_DONE.
+    """
+    program_words = _build_program_words(weights, thresholds)
+    dut._log.info(f"Booting chip: BOOT_REQ + {len(program_words)} program words")
+    await _spi_stream(dut, pins, [_boot_req()], tag="boot_req")
+    await ClockCycles(dut.clk_PAD, _EVT_LD_EN_WAIT_CYCLES)
+    await _spi_stream(dut, pins, program_words, tag="program")
+    await ClockCycles(dut.clk_PAD, 100)
+
+# ── Speedup levers ────────────────────────────────────────────────────────────
+# A full 4-gesture run streams ≈ 1 M EVT2 words at 68 chip cycles each (32 SCLK
+# bits × 2 cycles per bit + 4 inter-gap), i.e. ≈ 68 M chip cycles → 1.06 s of
+# simulated time.  Icarus typically runs ~1-5× slower than wall clock on this
+# design, so a full run can take 5-15 minutes.  When iterating, use any of:
+#
+#   GESTURE_INDICES=0       Run only Down (4× faster than full run).
+#   GESTURE_INDICES=0,1     Run Down + Left (2× faster).
+#   MAX_STREAM_WORDS=5000   Truncate each recording to 5 000 words (50× faster
+#                            but classification will be wrong — connectivity
+#                            and SPI-stream check only, not accuracy).
+#   BIN_LENGTH_US=50000     50 ms bins → first window in 0.4 s of event time
+#                            (less of the recording needs to be streamed before
+#                            gestures fire — but the model was trained on
+#                            125 ms bins so accuracy will drop).
+#
+# Hard cap on total words streamed per recording (0 = stream the entire file).
+_MAX_STREAM_WORDS = int(os.getenv("MAX_STREAM_WORDS", "0"))
+
+# Comma-separated list of gesture indices to run (default = all 4).
+# 0=Down, 1=Left, 2=Right, 3=Up.
+_GESTURE_INDICES = [
+    int(s) for s in os.getenv("GESTURE_INDICES", "0,1,2,3").split(",") if s.strip()
+]
+
+
+class _GestureResult:
+    """
+    Records *every* gesture_valid pulse the chip emits during one recording.
+
+    The chip implements a sliding-window classifier: each bin rollover triggers
+    a fresh readout → MAC scan → classifier decision → gesture_valid pulse.
+    A typical 1-second recording therefore produces 6-8 gesture_valid pulses,
+    NOT a single one.  voxel_bin_core_tb confirms this and uses the dominant
+    class (most-frequent of all pulses) as the chip's verdict.
+
+    The first pulse can be misleading: e.g. wave_left starts with a downward
+    arc whose feature vector resembles wave_up, so the first window classifies
+    as "Up" before the full motion is observed.  Using the dominant class is
+    therefore the correct way to validate the chip's classification — exactly
+    matching the methodology of voxel_bin_core_tb.
+    """
+    def __init__(self):
+        self.fired      = False        # at least one gesture_valid pulse seen
+        self.gesture    = None         # dominant gesture (set after collection)
+        self.confidence = None         # confidence of dominant class (last pulse)
+        self.gestures   = []           # ordered list of (gesture, confidence)
+
+    def dominant(self):
+        """(gesture, confidence) of the most-frequent class.  None if empty."""
+        if not self.gestures:
+            return None, None
+        counts = {}
+        for g, _ in self.gestures:
+            counts[g] = counts.get(g, 0) + 1
+        winner = max(counts, key=counts.get)
+        # Use the most-recent confidence reported for the winning class.
+        for g, c in reversed(self.gestures):
+            if g == winner:
+                return winner, c
+        return winner, 0
+
+
+async def _gesture_monitor(dut, result):
+    """
+    Background task: poll gesture_valid on every rising chip-clock edge and
+    record EVERY pulse (not just the first).
+
+    RisingEdge on deep-hierarchy signals is unreliable in Icarus 12 / cocotb
+    2.0.x (the VPI callback may not fire for intermediate nets), so we poll
+    on the top-level chip clock instead.
+
+    NOTE: must collect every pulse — see _GestureResult docstring for why the
+    first pulse alone is not sufficient to determine the chip's classification.
+    """
+    try:
+        while True:
+            await RisingEdge(dut.clk_PAD)
+            if _sig(dut, "i_chip_core.u_soc.gesture_valid") == 1:
+                g = _sig(dut, "i_chip_core.u_soc.gesture")
+                c = _sig(dut, "i_chip_core.u_soc.gesture_confidence")
+                result.gestures.append((g, c))
+                result.fired = True
+                dut._log.info(
+                    f"  gesture_valid #{len(result.gestures)}: "
+                    f"gesture={g} ({GESTURE_NAMES.get(g, '?')}), confidence={c}"
+                )
+    except Exception:
+        pass  # task was cancelled at end of recording
+
+
+async def _stream_recording(dut, pins, bin_path):
+    """
+    Stream the full EVT2 .bin file through chip_top's default SPI pins, then
+    drain the pipeline and return every gesture_valid pulse the chip emitted.
+
+    No early exit: the chip's sliding-window classifier produces multiple
+    gesture_valid pulses per recording (one per bin rollover after the first
+    full readout window), and we MUST collect them all because the very first
+    pulse may classify into a misleading class — see _GestureResult docstring.
+    Streaming the full recording also matches how a real event camera would
+    feed events into the chip (continuous, no premature stop) and naturally
+    drains the voxel-binning ring buffer via the appended flush events.
+    """
+    words = _read_bin(bin_path)
+    words = _append_flush_events(list(words))
+    if _MAX_STREAM_WORDS > 0:
+        words = words[:_MAX_STREAM_WORDS]
+
+    total = len(words)
+    stem  = Path(bin_path).stem
+    dut._log.info(f"Streaming {Path(bin_path).name}: {total} words "
+                  f"(single CS-low burst)")
+
+    result       = _GestureResult()
+    monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
+
+    # Single SPI burst with CS held low for the entire stream — matches how a
+    # real GenX320 sensor delivers events: continuous, no CS toggling.  The
+    # previous chunked implementation toggled CS every 200 words, which is a
+    # testbench artifact that wouldn't exist in production silicon.
+    #
+    # inter_gap=4: SPI re-arm needs ≥ 3 chip cycles minimum (IDLE →
+    # process_next_word pulse → CYCLE_BITS).  Using 2 was too tight; 4 gives
+    # 2 cycles of slack.
+    await _spi_stream(dut, pins, words, inter_gap=4,
+                      progress_every=10_000, tag=stem)
+
+    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
+    #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
+    #   • MAC engine settling (~2049)
+    #   • classifier 4-stage pipeline
+    # so the chip has emitted every gesture_valid pulse it will ever emit for
+    # this recording before we cancel the monitor.
+    dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
+    await ClockCycles(dut.clk_PAD, 50_000)
+
+    monitor_task.cancel()
+
+    if not result.gestures:
+        raise AssertionError(
+            f"No gesture_valid pulses fired after streaming {stem} "
+            f"({total} words) + 50 000 drain cycles"
+        )
+
+    # Compute dominant class — voxel_bin_core_tb-style validation.
+    dom_g, dom_c = result.dominant()
+    counts = {}
+    for g, _ in result.gestures:
+        counts[g] = counts.get(g, 0) + 1
+    hist = " ".join(f"{GESTURE_NAMES.get(g, '?')}:{n}"
+                    for g, n in sorted(counts.items()))
+    dut._log.info(
+        f"[{stem}] {len(result.gestures)} gesture pulses; histogram=({hist}); "
+        f"dominant={GESTURE_NAMES.get(dom_g, '?')} (confidence={dom_c})"
+    )
+
+    result.gesture    = dom_g
+    result.confidence = dom_c
+    return result
+
+def _expected_miso(gesture, confidence):
+    return (((confidence & 1) << 2) | (gesture & 0x3)) << (DATA_WIDTH - 3)
+
+# ── Classification tests ──────────────────────────────────────────────────────
+
+@cocotb.test()
+async def test_classify_all_gestures(dut):
+    """
+    Full chip-top classification verification.
+
+    For each of the 4 gesture recordings (Down, Left, Right, Up):
+      1. Reset and boot the chip with learned weights and thresholds over SPI.
+      2. Stream the EVT2 .bin recording through chip_top input_PAD SPI pins.
+      3. Wait for gesture_valid from the on-chip classifier.
+      4. Assert the reported gesture matches the expected label.
+      5. Read the classification back through MISO to confirm the SPI output path.
+
+    This proves end-to-end correctness from the chip_top IO pads through the
+    full pipeline: IO pads → SPI front-end → EVT2 decoder → voxel binning →
+    MAC engine → gesture classifier → MISO output pin.
+    """
+    bin_files = _resolve_bin_files()
+    selected  = [(i, bin_files[i]) for i in _GESTURE_INDICES if 0 <= i < len(bin_files)]
+    if not selected:
+        raise ValueError(
+            f"GESTURE_INDICES={_GESTURE_INDICES} selected no valid gestures "
+            f"(valid range: 0..{len(bin_files)-1})"
+        )
+    for _, bf in selected:
+        if not bf.exists():
+            raise FileNotFoundError(
+                f"Missing test recording: {bf}\n"
+                "Run 'git lfs pull' to fetch the EVT2 gesture set."
+            )
+
+    if len(selected) < len(bin_files):
+        skipped = [GESTURE_NAMES[i] for i in range(len(bin_files))
+                   if i not in {s[0] for s in selected}]
+        cocotb.log.info(
+            f"GESTURE_INDICES filter active: running "
+            f"{[GESTURE_NAMES[i] for i, _ in selected]}, skipping {skipped}"
+        )
+
+    weights    = _load_weights()
+    thresholds = _load_thresholds()
+
+    results = []
+
+    for slot, (idx, bin_path) in enumerate(selected):
+        expected = _EXPECTED_CLASS[idx]
+        dut._log.info("=" * 70)
+        dut._log.info(f"Gesture {idx}: {GESTURE_NAMES[expected]}  ({bin_path.name})")
+        dut._log.info("=" * 70)
+
+        # Fresh reset for every recording.  Gate the one-time clock startup on
+        # `slot` (loop iteration) not `idx` (gesture index): with a filter like
+        # GESTURE_INDICES=2,3 the first iteration has idx=2, but it is still
+        # the first time we need to start the clock.
+        pins = InputPins()
+        if slot == 0:
+            await _start_clock(dut)
+            await NextTimeStep()
+        await _reset(dut, pins)
+        await _wait_spi_ready(dut)
+
+        # Boot: send weights + thresholds
+        await _boot_chip_top(dut, pins, weights, thresholds)
+
+        # Stream the full recording and collect every gesture_valid pulse.
+        result = await _stream_recording(dut, pins, bin_path)
+        dom_gesture    = result.gesture       # dominant class (correctness)
+        dom_confidence = result.confidence
+        last_gesture, last_confidence = result.gestures[-1]   # MISO comparand
+
+        dut._log.info(
+            f"Dominant classifier output: gesture={dom_gesture} "
+            f"({GESTURE_NAMES.get(dom_gesture, dom_gesture)}), "
+            f"confidence={dom_confidence}"
+        )
+
+        # Give spi_wrapper time to latch the latest classification
+        await ClockCycles(dut.clk_PAD, 20)
+
+        # Read classification back through MISO (dummy DEBUG_PAGE transfer).
+        # spi_wrapper latches the latest gesture pulse, so MISO reflects the
+        # LAST gesture_valid in the run, not necessarily the dominant one.
+        miso = await _spi_xfer(dut, pins, _debug_page(0), tag="miso_readback")
+        expected_miso = _expected_miso(last_gesture, last_confidence)
+
+        assert miso == expected_miso, (
+            f"[{bin_path.name}] MISO mismatch (last latched gesture): "
+            f"got 0x{miso:08X}, expected 0x{expected_miso:08X} "
+            f"(last gesture={GESTURE_NAMES.get(last_gesture, last_gesture)}, "
+            f"confidence={last_confidence})"
+        )
+
+        # Correctness assertion uses the DOMINANT class — matches the
+        # validation methodology of voxel_bin_core_tb, which also accepts
+        # that the first window of a recording can classify into a
+        # misleading class (e.g. wave_left starts with a downward arc that
+        # looks like wave_up) and only the dominant of all windows is the
+        # true verdict.
+        assert dom_gesture == expected, (
+            f"[{bin_path.name}] Wrong dominant classification: "
+            f"got {GESTURE_NAMES.get(dom_gesture, dom_gesture)}, "
+            f"expected {GESTURE_NAMES[expected]} "
+            f"(pulses: "
+            f"{[GESTURE_NAMES.get(g, g) for g, _ in result.gestures]})"
+        )
+
+        results.append((GESTURE_NAMES[expected], dom_gesture, dom_confidence,
+                        len(result.gestures)))
+        dut._log.info(
+            f"PASS [{bin_path.name}]: "
+            f"expected={GESTURE_NAMES[expected]}, "
+            f"dominant={GESTURE_NAMES.get(dom_gesture, dom_gesture)} "
+            f"(from {len(result.gestures)} pulses), "
+            f"last={GESTURE_NAMES.get(last_gesture, last_gesture)}, "
+            f"confidence={dom_confidence}, MISO=0x{miso:08X}"
+        )
+
+    dut._log.info("=" * 70)
+    dut._log.info(
+        f"ALL {len(results)} GESTURE{'S' if len(results) != 1 else ''} "
+        f"CLASSIFIED CORRECTLY"
+    )
+    for name, g, c, n in results:
+        dut._log.info(
+            f"  {name:6s} → {GESTURE_NAMES.get(g, g)} "
+            f"(confidence={c}, {n} pulses)"
+        )
+    dut._log.info("=" * 70)
 
 
 # ── Runner ────────────────────────────────────────────────────────────────────
