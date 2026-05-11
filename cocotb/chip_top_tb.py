@@ -779,7 +779,20 @@ class _GestureResult:
         self.gestures   = []           # ordered list of (gesture, confidence)
 
     def dominant(self):
-        """(gesture, confidence) of the most-frequent class.  None if empty."""
+        """(gesture, confidence) of the most-frequent class. None if empty.
+
+        Two paths:
+          GL: uses _gesture_spans (set by _stream_recording's GL branch),
+              which weights each gesture by how many stream words held it
+              on MISO. spi_wrapper re-latches the same value on every
+              gesture_valid pulse, so duration ≈ pulse count.
+          RTL: counts distinct (gesture, confidence) entries in self.gestures
+              (one per gesture_valid pulse, captured by _gesture_monitor).
+        """
+        if hasattr(self, "_gesture_spans") and self._gesture_spans:
+            winner = max(self._gesture_spans, key=self._gesture_spans.get)
+            conf   = self._last_conf_per_g.get(winner, 0)
+            return winner, conf
         if not self.gestures:
             return None, None
         counts = {}
@@ -865,10 +878,15 @@ async def _stream_recording(dut, pins, bin_path):
       RTL: a background task polls i_chip_core.u_soc.gesture_valid on every
            clock edge and captures every pulse (including during the stream).
       GLS: internal signals are flattened/escaped after synthesis, so we
-           sample MISO via DEBUG_PAGE reads during the drain phase. We miss
-           pulses that fire during the stream, but spi_wrapper latches the
-           last pulse and the drain-time pulses (driven by the appended flush
-           events) settle onto the chip's final classification.
+           use the SPI bus's full-duplex MISO channel: enabling capture_miso
+           on the recording stream gives one classification snapshot per
+           32-bit word. spi_wrapper drives MISO with {gesture_confidence,
+           gesture[1:0], 29'b0}, so every transition we observe in those
+           captured words corresponds to a gesture_valid pulse. The final
+           18 stream words are the appended flush events — those bins are
+           near-empty and reliably classify as (Down, 0), so we must
+           observe DURING the stream, not just after, to catch the real
+           gesture pulses before flush events overwrite classification_output.
 
     No early exit: the chip's sliding-window classifier produces multiple
     gesture_valid pulses per recording (one per bin rollover after the first
@@ -891,20 +909,65 @@ async def _stream_recording(dut, pins, bin_path):
     result = _GestureResult()
 
     if gl:
-        # Single SPI burst with CS held low for the entire stream — matches
-        # how a real GenX320 sensor delivers events: continuous, no CS
-        # toggling. inter_gap=4: SPI re-arm needs ≥ 3 chip cycles minimum
-        # (IDLE → process_next_word pulse → CYCLE_BITS).
-        await _spi_stream(dut, pins, words, inter_gap=4,
-                          progress_every=10_000, tag=stem)
+        # Capture MISO bits on every SPI clock edge — full-duplex gives us
+        # one classification snapshot per 32-bit word streamed.
+        miso_words = await _spi_stream(dut, pins, words, inter_gap=4,
+                                       capture_miso=True,
+                                       progress_every=10_000, tag=stem)
 
-        # 20 MISO samples × 2500 cycle gaps ≈ 50 000-cycle drain window,
-        # matching the RTL path. Each DEBUG_PAGE read adds ~80 cycles of SPI
-        # activity but does not disturb the in-flight pipeline (the decoder
-        # accepts DEBUG_PAGE in any state).
-        dut._log.info("Recording consumed; sampling MISO during drain …")
-        await _sample_miso_during_drain(dut, pins, result,
-                                        num_samples=20, gap_cycles=2500)
+        # The last 18 stream words are appended synthetic flush events
+        # (_append_flush_events). They trigger drain-time bin rollovers on
+        # near-empty bins which reliably classify as (Down, 0) — that's not
+        # the chip's verdict on the recording. Skip them.
+        FLUSH_WORDS = 18
+        real_words  = miso_words[:max(0, len(miso_words) - FLUSH_WORDS)]
+
+        # Span-weighted histogram. spi_wrapper re-latches classification_output
+        # on every gesture_valid pulse, so MISO does NOT transition between
+        # same-value pulses — but a class that produced many pulses will hold
+        # MISO at its value for many stream words. Span (=run length) is the
+        # right RTL-equivalent of "pulse count".
+        spans = {}                  # gesture (0..3) -> total stream words held
+        last_conf_per_g = {}        # gesture -> most-recent confidence
+        prev_g = None
+        prev_c = None
+        run    = 0
+        n_transitions = 0
+        for miso in real_words:
+            gesture    = (miso >> (DATA_WIDTH - 3)) & 0x3
+            confidence = (miso >> (DATA_WIDTH - 1)) & 0x1
+            if gesture != prev_g:
+                if prev_g is not None:
+                    spans[prev_g] = spans.get(prev_g, 0) + run
+                    result.gestures.append((prev_g, prev_c))
+                    n_transitions += 1
+                prev_g = gesture
+                prev_c = confidence
+                run    = 1
+            else:
+                run += 1
+                prev_c = confidence       # capture most-recent confidence
+            last_conf_per_g[gesture] = confidence
+        if prev_g is not None:
+            spans[prev_g] = spans.get(prev_g, 0) + run
+            result.gestures.append((prev_g, prev_c))
+        result.fired = bool(result.gestures)
+
+        # Stash spans for the dominant() computation below.
+        result._gesture_spans = spans
+        result._last_conf_per_g = last_conf_per_g
+        result._transitions = n_transitions
+
+        span_str = " ".join(
+            f"{GESTURE_NAMES.get(g, '?')}:{v}" for g, v in sorted(spans.items())
+        )
+        dut._log.info(
+            f"  {len(real_words)} stream words → {n_transitions} transitions; "
+            f"spans=({span_str})"
+        )
+
+        # Brief settle for the readback assertion below.
+        await ClockCycles(dut.clk_PAD, 5_000)
     else:
         # RTL path: internal-signal monitor runs concurrently with the
         # stream and captures every pulse.
@@ -946,10 +1009,68 @@ def _expected_miso(gesture, confidence):
 
 # ── Classification tests ──────────────────────────────────────────────────────
 
+# Diagnostic test: streams a chunk of events, then probes each pipeline stage
+# via DEBUG_PAGE reads. Skipped by default; enable with DIAGNOSTIC=1 in env.
+# Run only in GL mode where we cannot probe internal signals directly.
+@cocotb.test(skip=not (bool(gl) and bool(os.getenv("DIAGNOSTIC"))))
+async def test_diagnostic_pipeline_probe(dut):
+    """
+    Streams ~60K words of wave_left in chunks, pausing between chunks to
+    read every debug page. Lets us see WHICH pipeline stage stops advancing
+    in GLS:
+      Page 3 (FSM)       — boot_done? load_state correct?
+      Page 2 (decoder)   — event_valid pulsing? FIFO non-empty?
+      Page 1 (binning)   — readout_valid/last pulsing? bin counters moving?
+      Page 0 (classifier+MAC) — scores_valid? gesture_valid?
+    """
+    bin_files = _resolve_bin_files()
+    bin_path  = bin_files[1]   # wave_left
+    if not bin_path.exists():
+        raise FileNotFoundError(f"Missing: {bin_path}")
+
+    weights    = _load_weights()
+    thresholds = _load_thresholds()
+
+    pins = InputPins()
+    await _start_clock(dut)
+    await NextTimeStep()
+    await _reset(dut, pins)
+    await _wait_spi_ready(dut)
+    await _boot_chip_top(dut, pins, weights, thresholds)
+
+    # Snapshot all debug pages — non-intrusive sequence of SPI reads.
+    async def snapshot(label):
+        dut._log.info(f"=== snapshot: {label} ===")
+        for p in range(5):
+            # Send DEBUG_PAGE(p), then read debug_bus from bidir_PAD[37:6]
+            await _spi_stream(dut, pins, [_debug_page(p)], tag=f"snap_pg{p}")
+            await ClockCycles(dut.clk_PAD, 10)
+            bus = _read_debug_bus(dut)
+            dut._log.info(f"  page {p}: debug_bus=0x{bus:08X}")
+
+    await snapshot("post-boot")
+
+    # Load recording, drop flush events for diagnostic clarity
+    full = _read_bin(bin_path)
+    chunk_size = 30_000
+    for chunk_idx in range(3):
+        start = chunk_idx * chunk_size
+        end   = start + chunk_size
+        chunk = full[start:end]
+        if not chunk:
+            break
+        dut._log.info(f"streaming chunk {chunk_idx} words [{start}:{end}]")
+        await _spi_stream(dut, pins, chunk, inter_gap=4,
+                          progress_every=10_000, tag=f"chunk{chunk_idx}")
+        # CS goes high here (between bursts); let pipeline settle
+        await ClockCycles(dut.clk_PAD, 5_000)
+        await snapshot(f"after chunk {chunk_idx} ({end} words streamed)")
+
+
 # Runs in both RTL and GLS. The internal-signal monitor used in RTL is
-# replaced by periodic MISO sampling during drain in GL mode — see
-# _stream_recording and _sample_miso_during_drain. Pin-only observability
-# in GL still validates the full pipeline including SRAM read/write paths.
+# replaced by capturing MISO during the stream in GL mode — see
+# _stream_recording. Pin-only observability in GL still validates the full
+# pipeline including SRAM read/write paths.
 @cocotb.test()
 async def test_classify_all_gestures(dut):
     """
@@ -1176,6 +1297,13 @@ def chip_top_runner():
     if sim == "verilator":
         build_args = [
             "--timing", "--trace", "--trace-fst", "--trace-structs",
+            # Force deterministic 0-initialization for all uninitialized
+            # variables (Verilator 5.x defaults to "unique" which inserts
+            # random-X values for unassigned regs — fine for finding races
+            # but introduces nondeterminism into GLS where many flops only
+            # reset synchronously).
+            "--x-initial", "0",
+            "--x-assign", "0",
             # The gate-level netlist produces thousands of benign warnings:
             # WIDTH on tie cells, UNOPTFLAT on the IO pad inout chains,
             # PINMISSING / IMPLICIT on IP module instantiations,
