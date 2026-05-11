@@ -821,10 +821,54 @@ async def _gesture_monitor(dut, result):
         pass  # task was cancelled at end of recording
 
 
+async def _sample_miso_during_drain(dut, pins, result, *, num_samples, gap_cycles):
+    """
+    Pin-level alternative to _gesture_monitor for GLS.
+
+    spi_wrapper latches the most-recent gesture_valid pulse into the SPI
+    readback path, so repeatedly issuing DEBUG_PAGE SPI reads during the
+    drain phase reconstructs the histogram of distinct (gesture, confidence)
+    values the chip emitted — without touching any internal RTL signal that
+    flattens away after synthesis.
+
+    De-duplication: consecutive samples that read the same (gesture,
+    confidence) are merged. spi_wrapper holds the last value until the next
+    gesture_valid pulse, so an unchanged read means no new pulse fired.
+    """
+    prev = None
+    for i in range(num_samples):
+        await ClockCycles(dut.clk_PAD, gap_cycles)
+        miso = await _spi_xfer(dut, pins, _debug_page(0),
+                                tag=f"drain_miso_{i}")
+        # MISO encoding (see _expected_miso): bit[31]=confidence,
+        # bits[30:29]=gesture.
+        gesture    = (miso >> (DATA_WIDTH - 3)) & 0x3
+        confidence = (miso >> (DATA_WIDTH - 1)) & 0x1
+        cur = (gesture, confidence)
+        if cur == prev:
+            continue
+        result.gestures.append(cur)
+        result.fired = True
+        prev = cur
+        dut._log.info(
+            f"  drain MISO sample #{i}: gesture={gesture} "
+            f"({GESTURE_NAMES.get(gesture, '?')}), confidence={confidence}"
+        )
+
+
 async def _stream_recording(dut, pins, bin_path):
     """
     Stream the full EVT2 .bin file through chip_top's default SPI pins, then
     drain the pipeline and return every gesture_valid pulse the chip emitted.
+
+    Observability differs by mode:
+      RTL: a background task polls i_chip_core.u_soc.gesture_valid on every
+           clock edge and captures every pulse (including during the stream).
+      GLS: internal signals are flattened/escaped after synthesis, so we
+           sample MISO via DEBUG_PAGE reads during the drain phase. We miss
+           pulses that fire during the stream, but spi_wrapper latches the
+           last pulse and the drain-time pulses (driven by the appended flush
+           events) settle onto the chip's final classification.
 
     No early exit: the chip's sliding-window classifier produces multiple
     gesture_valid pulses per recording (one per bin rollover after the first
@@ -844,30 +888,36 @@ async def _stream_recording(dut, pins, bin_path):
     dut._log.info(f"Streaming {Path(bin_path).name}: {total} words "
                   f"(single CS-low burst)")
 
-    result       = _GestureResult()
-    monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
+    result = _GestureResult()
 
-    # Single SPI burst with CS held low for the entire stream — matches how a
-    # real GenX320 sensor delivers events: continuous, no CS toggling.  The
-    # previous chunked implementation toggled CS every 200 words, which is a
-    # testbench artifact that wouldn't exist in production silicon.
-    #
-    # inter_gap=4: SPI re-arm needs ≥ 3 chip cycles minimum (IDLE →
-    # process_next_word pulse → CYCLE_BITS).  Using 2 was too tight; 4 gives
-    # 2 cycles of slack.
-    await _spi_stream(dut, pins, words, inter_gap=4,
-                      progress_every=10_000, tag=stem)
+    if gl:
+        # Single SPI burst with CS held low for the entire stream — matches
+        # how a real GenX320 sensor delivers events: continuous, no CS
+        # toggling. inter_gap=4: SPI re-arm needs ≥ 3 chip cycles minimum
+        # (IDLE → process_next_word pulse → CYCLE_BITS).
+        await _spi_stream(dut, pins, words, inter_gap=4,
+                          progress_every=10_000, tag=stem)
 
-    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
-    #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
-    #   • MAC engine settling (~2049)
-    #   • classifier 4-stage pipeline
-    # so the chip has emitted every gesture_valid pulse it will ever emit for
-    # this recording before we cancel the monitor.
-    dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
-    await ClockCycles(dut.clk_PAD, 50_000)
-
-    monitor_task.cancel()
+        # 20 MISO samples × 2500 cycle gaps ≈ 50 000-cycle drain window,
+        # matching the RTL path. Each DEBUG_PAGE read adds ~80 cycles of SPI
+        # activity but does not disturb the in-flight pipeline (the decoder
+        # accepts DEBUG_PAGE in any state).
+        dut._log.info("Recording consumed; sampling MISO during drain …")
+        await _sample_miso_during_drain(dut, pins, result,
+                                        num_samples=20, gap_cycles=2500)
+    else:
+        # RTL path: internal-signal monitor runs concurrently with the
+        # stream and captures every pulse.
+        monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
+        await _spi_stream(dut, pins, words, inter_gap=4,
+                          progress_every=10_000, tag=stem)
+        # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
+        #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
+        #   • MAC engine settling (~2049)
+        #   • classifier 4-stage pipeline
+        dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
+        await ClockCycles(dut.clk_PAD, 50_000)
+        monitor_task.cancel()
 
     if not result.gestures:
         raise AssertionError(
@@ -896,12 +946,11 @@ def _expected_miso(gesture, confidence):
 
 # ── Classification tests ──────────────────────────────────────────────────────
 
-# The classification test below reads a deep internal signal
-# (i_chip_core.u_soc.gesture_valid) which after synthesis becomes a flat
-# escaped wire inside `chip_top` and is not reachable via dotted python
-# attribute access. Skip the test in GLS mode — the five pin-level tests
-# above are the correct GLS sanity suite.
-@cocotb.test(skip=bool(gl))
+# Runs in both RTL and GLS. The internal-signal monitor used in RTL is
+# replaced by periodic MISO sampling during drain in GL mode — see
+# _stream_recording and _sample_miso_during_drain. Pin-only observability
+# in GL still validates the full pipeline including SRAM read/write paths.
+@cocotb.test()
 async def test_classify_all_gestures(dut):
     """
     Full chip-top classification verification.
@@ -985,12 +1034,16 @@ async def test_classify_all_gestures(dut):
         miso = await _spi_xfer(dut, pins, _debug_page(0), tag="miso_readback")
         expected_miso = _expected_miso(last_gesture, last_confidence)
 
-        assert miso == expected_miso, (
-            f"[{bin_path.name}] MISO mismatch (last latched gesture): "
-            f"got 0x{miso:08X}, expected 0x{expected_miso:08X} "
-            f"(last gesture={GESTURE_NAMES.get(last_gesture, last_gesture)}, "
-            f"confidence={last_confidence})"
-        )
+        # In GL mode the histogram was built FROM MISO reads, so asserting
+        # "MISO equals the last sample" is tautological; skip it. The
+        # dominant-class assertion below is the real correctness check.
+        if not gl:
+            assert miso == expected_miso, (
+                f"[{bin_path.name}] MISO mismatch (last latched gesture): "
+                f"got 0x{miso:08X}, expected 0x{expected_miso:08X} "
+                f"(last gesture={GESTURE_NAMES.get(last_gesture, last_gesture)}, "
+                f"confidence={last_confidence})"
+            )
 
         # Correctness assertion uses the DOMINANT class — matches the
         # validation methodology of voxel_bin_core_tb, which also accepts
@@ -1047,12 +1100,14 @@ def chip_top_runner():
             )
 
         pdk_libs = pdk_root / pdk / "libs.ref"
-        # Vendored override of gf180mcu_as_sc_mcu7t3v3.v — see header in that
-        # file for why we don't compile the upstream copy directly.
+        # Vendored overrides — see headers in each file for the per-cell
+        # reason. We use sim/ copies instead of the upstream PDK files for
+        # the std-cell library and the IO pads (Verilator can't elaborate
+        # the upstream IO models which use unsupported `rnmos` primitives).
         scl_v        = proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3.v"
         scl_prim     = pdk_libs / scl / "verilog" / "primitives.v"
-        io_v         = pdk_libs / "gf180mcu_fd_io" / "verilog" / "gf180mcu_fd_io.v"
-        ws_io_v      = pdk_libs / "gf180mcu_fd_io" / "verilog" / "gf180mcu_ws_io.v"
+        io_v         = proj_path / "../sim/gf180mcu_fd_io.v"
+        ws_io_v      = proj_path / "../sim/gf180mcu_ws_io.v"
 
         sources = [scl_v]
         if scl_prim.exists():
@@ -1119,7 +1174,25 @@ def chip_top_runner():
 
     build_args = []
     if sim == "verilator":
-        build_args = ["--timing", "--trace", "--trace-fst", "--trace-structs"]
+        build_args = [
+            "--timing", "--trace", "--trace-fst", "--trace-structs",
+            # The gate-level netlist produces thousands of benign warnings:
+            # WIDTH on tie cells, UNOPTFLAT on the IO pad inout chains,
+            # PINMISSING / IMPLICIT on IP module instantiations,
+            # MULTIDRIVEN on bidir pads. Suppress so the build doesn't
+            # blow up on `-Werror`.
+            "-Wno-WIDTH", "-Wno-UNOPTFLAT", "-Wno-PINMISSING",
+            "-Wno-IMPLICIT", "-Wno-MULTIDRIVEN", "-Wno-TIMESCALEMOD",
+            "-Wno-COMBDLY", "-Wno-INITIALDLY", "-Wno-CASEINCOMPLETE",
+            "-Wno-CASEX", "-Wno-LATCH", "-Wno-UNUSED",
+        ]
+
+    # Allow parallel invocations to use isolated build/result paths via env
+    # vars (e.g. one process per gesture). Defaults keep the single-process
+    # flow unchanged.
+    sim_build   = os.getenv("SIM_BUILD", "sim_build")
+    test_filter = os.getenv("COCOTB_TEST_FILTER")    # regex; None = all tests
+    results_xml = os.getenv("RESULTS_XML")           # absolute path or None
 
     runner = get_runner(sim)
     runner.build(
@@ -1129,6 +1202,7 @@ def chip_top_runner():
         always=True,
         includes=includes,
         build_args=build_args,
+        build_dir=sim_build,
         waves=True,
     )
 
@@ -1136,6 +1210,9 @@ def chip_top_runner():
         hdl_toplevel=hdl_toplevel,
         test_module="chip_top_tb,",
         plusargs=[],
+        build_dir=sim_build,
+        test_filter=test_filter,
+        results_xml=results_xml,
         waves=True,
     )
 

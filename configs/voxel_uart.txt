@@ -1,2 +1,0 @@
-CLK_FREQ_HZ         = 64_000_000
-BAUD_RATE           = 115200

@@ -7,6 +7,8 @@
 //      gf180mcu_as_sc_mcu7t3v3_missing_cells.v (compiled alongside this file).
 // Both should be upstreamed to AvalonSemiconductors/gf180mcu_as_sc_mcu7t3v3.
 
+`timescale 1ns/1ps
+
 module gf180mcu_as_sc_mcu7t3v3__dfxtp_2(
 	input VPW,
 	input VNW,
