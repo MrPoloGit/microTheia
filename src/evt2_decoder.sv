@@ -92,7 +92,7 @@ module evt2_decoder #(
     logic [10:0]          y_clamped;
     logic [GRID_BITS-1:0] x_grid;
     logic [GRID_BITS-1:0] y_grid;
-    logic [10+DIV_K:0]    x_prod_c, y_prod_c;
+    logic [11+DIV_K:0]    x_prod_c, y_prod_c;
     logic [GRID_BITS:0]   x_grid_raw, y_grid_raw;
 
     logic [17:0]          thresh_reg;
@@ -113,16 +113,16 @@ module evt2_decoder #(
         else
             y_clamped = y_raw;
 
-        x_prod_c   = x_clamped * X_M;
-        y_prod_c   = y_clamped * Y_M;
+        x_prod_c   = 24'(x_clamped * X_M);
+        y_prod_c   = 24'(y_clamped * Y_M);
 
         // shift the multiplied result down to get the raw grid coordinate.
-        x_grid_raw = x_prod_c >> DIV_K;
-        y_grid_raw = y_prod_c >> DIV_K;
+        x_grid_raw = (GRID_BITS+1)'(x_prod_c >> DIV_K);
+        y_grid_raw = (GRID_BITS+1)'(y_prod_c >> DIV_K);
 
         // clamp the raw grid coordinate to GRID_SIZE-1.
-        x_grid = (x_grid_raw >= GRID_SIZE) ? GRID_SIZE-1 : x_grid_raw;
-        y_grid = (y_grid_raw >= GRID_SIZE) ? GRID_SIZE-1 : y_grid_raw;
+        x_grid = (x_grid_raw >= GRID_SIZE) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(x_grid_raw);
+        y_grid = (y_grid_raw >= GRID_SIZE) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(y_grid_raw);
     end
 
     // Backpressure only for CD events that generate downstream samples.
