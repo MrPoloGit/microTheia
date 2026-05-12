@@ -115,10 +115,20 @@ def _debug_page(page):
 # ── Input pin shadow ──────────────────────────────────────────────────────────
 
 class InputPins:
-    """Shadow register so individual bits of input_PAD can be set."""
+    """Shadow register so individual bits of input_PAD can be set.
+
+    Verilator quirk: cocotb writes to a top-level `inout` port do not
+    propagate through the internal IO-pad model — `dut.input_PAD.value` is
+    visible from the outside but the chip's post-pad `input_in[]` bus stays
+    at 0. Workaround: also write directly to the chip-internal escaped
+    wires `\\i_chip_core.input_in[i] `. In RTL mode the internal handles
+    resolve to the same logical signal so the dual write is harmless; in
+    GL mode it's the only way the chip actually sees the bits.
+    """
 
     def __init__(self, width=12):
         self._v = 0
+        self._internal_bits = None   # lazy-resolved chip-side handles
 
     def set(self, idx, val):
         if val:
@@ -128,6 +138,12 @@ class InputPins:
 
     def drive(self, dut):
         dut.input_PAD.value = self._v
+        # Resolve once; write to each bit on every drive call.
+        if self._internal_bits is None:
+            self._internal_bits = _resolve_bus_handles(dut, "i_chip_core.input_in", 12)
+        if self._internal_bits is not None and len(self._internal_bits) > 1:
+            for i, h in enumerate(self._internal_bits):
+                h.value = (self._v >> i) & 1
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
 
@@ -803,6 +819,58 @@ async def _boot_chip_top(dut, pins, weights, thresholds):
     await _spi_stream(dut, pins, program_words, tag="program")
     await ClockCycles(dut.clk_PAD, 100)
 
+    # Ground-truth FSM check via internal signals (cached, no leak).
+    # In RTL these are accessible via hierarchy; in GL they're top-level
+    # escaped wires that _resolve_handle / _resolve_bus_handles can reach.
+    _probe_fsm_after_boot(dut)
+
+
+_MAIN_STATE_NAMES = {0: "ST_BOOT", 1: "ST_LOAD", 2: "ST_RUN", 3: "ST_DEBUG"}
+_LOAD_STATE_NAMES = {
+    0: "LD_IDLE", 1: "LD_WAIT_PWR", 2: "LD_OPEN",
+    3: "LD_WAIT", 4: "LD_DONE", 5: "LD_FAIL",
+}
+
+def _probe_fsm_after_boot(dut):
+    """Read the FSM state directly and log it; useful for diagnosing why
+    GLS classification fails. In a healthy boot we expect main_state=ST_RUN
+    (=2), evt_ld_en=0, core_rst_o=0.
+    """
+    h_main = _resolve_bus_handles(dut, "i_chip_core.u_soc.u_core.controller_fsm.main_state", 2)
+    h_load = _resolve_bus_handles(dut, "i_chip_core.u_soc.u_core.controller_fsm.load_state", 6)
+    h_ldn  = _resolve_handle(dut, "i_chip_core.u_soc.u_core.controller_fsm.evt_ld_en")
+    h_crst = _resolve_handle(dut, "i_chip_core.u_soc.u_core.controller_fsm.core_rst_o")
+    h_done = _resolve_handle(dut, "i_chip_core.u_soc.u_core.controller_fsm.evt_reads_done")
+
+    def _bits(handles):
+        if handles is None:
+            return None
+        if len(handles) == 1:
+            return int(handles[0].value)
+        v = 0
+        for i, h in enumerate(handles):
+            v |= (int(h.value) & 1) << i
+        return v
+
+    ms = _bits(h_main)
+    ls = _bits(h_load)
+    ldn = int(h_ldn.value) if h_ldn is not None else None
+    crst = int(h_crst.value) if h_crst is not None else None
+    erd = int(h_done.value) if h_done is not None else None
+
+    dut._log.info(
+        f"FSM probe post-boot: "
+        f"main_state={ms} ({_MAIN_STATE_NAMES.get(ms, '?')}) "
+        f"load_state={ls} ({_LOAD_STATE_NAMES.get(ls, '?')}) "
+        f"evt_ld_en={ldn} core_rst_o={crst} evt_reads_done={erd}"
+    )
+    if ms != 2:
+        dut._log.warning(
+            f"FSM did NOT reach ST_RUN — chip is stuck in {_MAIN_STATE_NAMES.get(ms, ms)} / "
+            f"{_LOAD_STATE_NAMES.get(ls, ls)}. The classifier cannot run until "
+            "main_state=ST_RUN (which deasserts core_rst_o and ungates MAC)."
+        )
+
 # ── Speedup levers ────────────────────────────────────────────────────────────
 # A full 4-gesture run streams ≈ 1 M EVT2 words at 68 chip cycles each (32 SCLK
 # bits × 2 cycles per bit + 4 inter-gap), i.e. ≈ 68 M chip cycles → 1.06 s of
@@ -1033,6 +1101,142 @@ def _expected_miso(gesture, confidence):
     return (((confidence & 1) << 2) | (gesture & 0x3)) << (DATA_WIDTH - 3)
 
 # ── Classification tests ──────────────────────────────────────────────────────
+
+# Targeted FSM-stepping diagnostic. After each boot step, read the FSM state
+# directly via internal signals (escaped names in GL, dotted hierarchy in RTL).
+# Pinpoints exactly which step the FSM fails to advance on.
+@cocotb.test(skip=not (bool(gl) and bool(os.getenv("FSM_STEP"))))
+async def test_fsm_step_diagnostic(dut):
+    """Step the chip through the boot sequence, probing main_state /
+    load_state / evt_ld_en / boot_req_i / evt_reads_done after each step.
+    """
+    pins = InputPins()
+    await _start_clock(dut)
+    await NextTimeStep()
+    await _reset(dut, pins)
+    await _wait_spi_ready(dut)
+
+    # Cache probe handles up front (only signals that survived synthesis).
+    h_main = _resolve_bus_handles(dut, "i_chip_core.u_soc.u_core.controller_fsm.main_state", 2)
+    h_load = _resolve_bus_handles(dut, "i_chip_core.u_soc.u_core.controller_fsm.load_state", 6)
+    h_ldn  = _resolve_handle(dut, "i_chip_core.u_soc.u_core.controller_fsm.evt_ld_en")
+    h_crst = _resolve_handle(dut, "i_chip_core.u_soc.u_core.controller_fsm.core_rst_o")
+    h_erd  = _resolve_handle(dut, "i_chip_core.u_soc.u_core.controller_fsm.evt_reads_done")
+    h_swvalid = _resolve_handle(dut, "i_chip_core.u_soc.evt_word_valid")
+    h_evt_count = _resolve_bus_handles(dut, "i_chip_core.u_soc.u_core.debug_event_count", 8)
+    h_evt_word = _resolve_bus_handles(dut, "i_chip_core.u_soc.evt_word", 32)
+
+    def _bits(h):
+        if h is None: return None
+        if len(h) == 1: return int(h[0].value)
+        v = 0
+        for i, x in enumerate(h):
+            v |= (int(x.value) & 1) << i
+        return v
+
+    def _b1(h):
+        return None if h is None else int(h.value)
+
+    async def probe(label):
+        await ClockCycles(dut.clk_PAD, 1)   # settle
+        ms = _bits(h_main); ls = _bits(h_load)
+        dut._log.info(
+            f"PROBE [{label}]: main={ms}({_MAIN_STATE_NAMES.get(ms,'?')}) "
+            f"load={ls}({_LOAD_STATE_NAMES.get(ls,'?')}) "
+            f"evt_ld_en={_b1(h_ldn)} core_rst={_b1(h_crst)} "
+            f"reads_done={_b1(h_erd)} "
+            f"spi.evt_word_valid={_b1(h_swvalid)} "
+            f"u_core.debug_event_count={_bits(h_evt_count)} "
+            f"u_soc.evt_word=0x{_bits(h_evt_word):08X}"
+        )
+
+    # Verify cocotb writes to input_PAD actually reach the chip internals.
+    # The chip-side bus is called i_chip_core.input_in (post-pad).
+    # IMPORTANT: avoid toggling bit 8 (ALT_INPUT_MODE) — its rising edge
+    # toggles alt_select, which re-routes SPI to the alt input pins.
+    h_in2core = _resolve_bus_handles(dut, "i_chip_core.input_in", 12)
+    for test_val in (0x000, 0x0FF, 0x055, 0x000):
+        pins._v = test_val
+        pins.drive(dut)
+        await ClockCycles(dut.clk_PAD, 4)
+        in2core = None
+        if h_in2core is not None:
+            v = 0
+            for i, hb in enumerate(h_in2core):
+                v |= (int(hb.value) & 1) << i
+            in2core = v
+        try:
+            ext = int(dut.input_PAD.value)
+        except Exception:
+            ext = -1
+        in2 = in2core if in2core is not None else -1
+        dut._log.info(
+            f"INPUT PROBE: drove input_PAD=0x{test_val:03X}  "
+            f"readback dut.input_PAD={ext:#x}  chip-side input_PAD2CORE={in2:#x}"
+        )
+    # Restore idle state
+    pins._v = 0
+    pins.set(PIN_DEF_CS, 1)
+    pins.set(PIN_ALT_CS, 1)
+    pins.drive(dut)
+    await ClockCycles(dut.clk_PAD, 4)
+
+    # Probe SPI input plumbing: toggle SCLK and check chip sees the edges.
+    h_sclk = _resolve_handle(dut, "i_chip_core.SCLK_wire")
+    h_cs   = _resolve_handle(dut, "i_chip_core.CS_wire")
+    h_mosi = _resolve_handle(dut, "i_chip_core.MOSI_wire")
+    h_in5  = (h_in2core[5] if h_in2core is not None and len(h_in2core) > 5 else None)
+    h_oe0  = _resolve_handle(dut, "bidir_CORE2PAD_OE[0]")
+    h_oe1  = _resolve_handle(dut, "bidir_CORE2PAD_OE[1]")
+    h_rstn = _resolve_handle(dut, "i_chip_core.rst_n")
+    dut._log.info(
+        f"RESET PROBE: chip rst_n={int(h_rstn.value) if h_rstn is not None else '?'} "
+        f"OE[0](=!alt_select)={int(h_oe0.value) if h_oe0 is not None else '?'} "
+        f"OE[1](=alt_select)={int(h_oe1.value) if h_oe1 is not None else '?'}"
+    )
+    pins.set(PIN_DEF_CS, 0)
+    pins.set(PIN_DEF_MOSI, 1)
+    pins.drive(dut)
+    await ClockCycles(dut.clk_PAD, 2)
+    for cycle in range(4):
+        pins.set(PIN_DEF_SCLK, 1)
+        pins.drive(dut)
+        await ClockCycles(dut.clk_PAD, 1)
+        dut._log.info(
+            f"SPI plumbing (SCLK_HI {cycle}): input_in[5]={int(h_in5.value) if h_in5 is not None else '?'} "
+            f"SCLK_wire={int(h_sclk.value) if h_sclk is not None else '?'} "
+            f"CS_wire={int(h_cs.value) if h_cs is not None else '?'} "
+            f"MOSI_wire={int(h_mosi.value) if h_mosi is not None else '?'}"
+        )
+        pins.set(PIN_DEF_SCLK, 0)
+        pins.drive(dut)
+        await ClockCycles(dut.clk_PAD, 1)
+        dut._log.info(
+            f"SPI plumbing (SCLK_LO {cycle}): input_in[5]={int(h_in5.value) if h_in5 is not None else '?'} "
+            f"SCLK_wire={int(h_sclk.value) if h_sclk is not None else '?'}"
+        )
+    # restore idle
+    pins._v = 0
+    pins.set(PIN_DEF_CS, 1)
+    pins.set(PIN_ALT_CS, 1)
+    pins.drive(dut)
+    await ClockCycles(dut.clk_PAD, 4)
+
+    await probe("post-reset")
+    await _spi_stream(dut, pins, [_boot_req()], tag="boot_req")
+    await probe("after BOOT_REQ word")
+    await ClockCycles(dut.clk_PAD, 50)
+    await probe("BOOT_REQ + 50 cycles")
+    await ClockCycles(dut.clk_PAD, 1100)
+    await probe("BOOT_REQ + 1150 cycles (expect LD_WAIT)")
+
+    # Send just a couple of program words to see if decoder advances them
+    await _spi_stream(dut, pins, [_w_weight(0, 0, 0)], tag="one_weight")
+    await probe("after one weight word")
+    await _spi_stream(dut, pins, [_w_reads_done()], tag="reads_done")
+    await ClockCycles(dut.clk_PAD, 200)
+    await probe("after reads_done + 200 cycles (expect ST_RUN)")
+
 
 # Diagnostic test: streams a chunk of events, then probes each pipeline stage
 # via DEBUG_PAGE reads. Skipped by default; enable with DIAGNOSTIC=1 in env.
