@@ -36,10 +36,14 @@ __pycache__/
 gf180mcu/
 gf180_drc.lyrdb
 sim_build/
+sim_build_*/
 final/
 img/
 *.lyrdb
 results.xml
+
+# Parallel GLS run artifacts (one set per gesture)
+logs/
 
 .sbt-global/
 build/

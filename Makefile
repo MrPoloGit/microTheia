@@ -207,9 +207,44 @@ sim-chip-top: ## Run chip_top RTL simulation with cocotb
 	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
 .PHONY: sim-chip-top
 
-sim-gl: ## Run gate-level simulation with cocotb (after copy-final)
+sim-gl: ## Run gate-level simulation with cocotb (Icarus; after copy-final)
 	cd cocotb; LD_LIBRARY_PATH="" GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim-gl
+
+sim-gl-verilator: ## Run gate-level simulation with Verilator (faster than Icarus)
+	cd cocotb; LD_LIBRARY_PATH="" SIM=verilator GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-gl-verilator
+
+# Run the 4 gesture classifications in parallel, one process per core.
+# Each gets its own SIM_BUILD dir, log file, and results.xml.
+#
+# Uses Icarus, NOT Verilator, because Verilator does not propagate cocotb
+# writes to top-level `inout` ports (clk_PAD/rst_n_PAD/input_PAD) through
+# the IO-pad model's `assign Y = PAD` to the chip-internal post-pad signals.
+# In Verilator GL the chip stays in reset and the SPI never moves. Icarus
+# handles inout deposits correctly. ~7h wall time per gesture; 4 in
+# parallel ≈ 7h total.
+sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gesture)
+	@mkdir -p logs
+	@echo "Launching 4 parallel GL classify runs (gestures 0-3, Icarus) …"
+	@set -e ; for g in 0 1 2 3 ; do \
+		LD_LIBRARY_PATH="" SIM=icarus GL=1 \
+		  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
+		  GESTURE_INDICES=$$g \
+		  COCOTB_TEST_FILTER=test_classify_all_gestures \
+		  SIM_BUILD=$(MAKEFILE_DIR)/cocotb/sim_build_gl_g$$g \
+		  RESULTS_XML=$(MAKEFILE_DIR)/logs/results_gl_g$$g.xml \
+		  python3 $(MAKEFILE_DIR)/cocotb/chip_top_tb.py \
+		  > $(MAKEFILE_DIR)/logs/gls_gesture_$$g.log 2>&1 & \
+		echo "  PID $$! → gesture $$g, log: logs/gls_gesture_$$g.log" ; \
+	done ; \
+	wait
+	@echo
+	@echo "All gesture runs finished. Summary:"
+	@for g in 0 1 2 3 ; do \
+		echo "  Gesture $$g: $$(grep -oE 'PASS=[0-9]+ FAIL=[0-9]+ SKIP=[0-9]+' logs/gls_gesture_$$g.log | tail -1)" ; \
+	done
+.PHONY: sim-gl-parallel
 
 sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
