@@ -155,16 +155,16 @@ module voxel_binning #(
         acc_event_ts    = pending_event_valid ? pending_event_ts : ts_in;
 
         wr_bin_plus_1 = wr_bin_idx + 1'b1;
-        next_wr_bin   = (wr_bin_plus_1 >= NUM_BINS)
+        next_wr_bin   = (wr_bin_plus_1 >= BIN_BITS'(NUM_BINS))
                         ? BIN_BITS'(wr_bin_plus_1 - NUM_BINS)
                         : BIN_BITS'(wr_bin_plus_1);
 
-        start_calc         = wr_bin_idx + NUM_BINS - (READOUT_BINS - 1);
-        snapshot_start_bin = (start_calc >= NUM_BINS)
+        start_calc         = (BIN_BITS+1)'(wr_bin_idx) + (BIN_BITS+1)'(NUM_BINS) - (BIN_BITS+1)'((READOUT_BINS - 1));
+        snapshot_start_bin = (start_calc >= (BIN_BITS+1)'(NUM_BINS))
                              ? BIN_BITS'(start_calc - NUM_BINS)
                              : BIN_BITS'(start_calc);
 
-        completed_bins_next = (completed_bins < NUM_BINS)
+        completed_bins_next = (completed_bins < BIN_COUNT_BITS'(NUM_BINS))
                               ? BIN_COUNT_BITS'(completed_bins + 1)
                               : completed_bins;
 
