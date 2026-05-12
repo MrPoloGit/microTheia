@@ -32,50 +32,42 @@ module evt2_decoder #(
     output logic [SCORE_BITS-1:0]        thresh_data_o,
     output logic [2:0]                   thresh_addr_o,
     output logic                         thresh_event_valid,
-    output logic [33:0]                  ts_out,       // full 34-bit timestamp of last CD event
+    output logic [33:0]                  ts_out,
     output logic [33:0]                  bin_length_us,
     output logic                         bin_length_valid,
     output logic                         debug_req_o,
     output logic                         reload_req_o,
     output logic                         boot_req_o,
-    output logic [11:0]                  decoder_dbg,  //debug bus
+    output logic [11:0]                  decoder_dbg,
     output logic [31:0]                  decoder_output_dbg,
     output logic [3:0]                   debug_page_sel
 );
 
-    localparam int GRID_BITS = $clog2(GRID_SIZE);
+    localparam int GRID_BITS  = $clog2(GRID_SIZE);
 
     localparam logic [3:0] EVT_CD_OFF     = 4'h0;
     localparam logic [3:0] EVT_CD_ON      = 4'h1;
-    //Weight: [4 bit type address], [8 bit weight], [11 bit address], [2 bit sram address], [7 don't care]
     localparam logic [3:0] EVT_WEIGHT     = 4'h2;
-    //Thresh: [4 bit type address], [18 bit upper/lower bits of threshold data], [3 bit threshold address], [7 don't care]
     localparam logic [3:0] EVT_THRESH_U   = 4'h3;
     localparam logic [3:0] EVT_THRESH_L   = 4'h4;
-    //adding programmable bin length opcode
-    //Bin length upper: [4 bit opcode], [11 Don't care] [17 bits upper bits of bin length]
-    localparam logic [3:0] BIN_LENGTH_U   = 4'h5; //5 is not specified in public prophesee documentation, but they do mention other non-documented event types exist and to contact them if seen
-    //Bin length lower: [4 bit opcode], [11 Don't care] [17 bits lower bits of bin length]
-    localparam logic [3:0] BIN_LENGTH_L   = 4'h6; // 6 is the EXT_TRIGGER event type for EVT2.0, we have no external devices connected to the sensor so it will not be present in the stream.
-    //No important address structure, only OPCODE matters
+    localparam logic [3:0] BIN_LENGTH_U   = 4'h5;
+    localparam logic [3:0] BIN_LENGTH_L   = 4'h6;
     localparam logic [3:0] EVT_TIME_HIGH  = 4'h8;
     localparam logic [3:0] DEBUG_REQ      = 4'ha;
     localparam logic [3:0] RELOAD_REQ     = 4'hb;
     localparam logic [3:0] BOOT_REQ       = 4'hc;
-    //Debug: [4 bit address], [4 bit page select], [24 don't care]
     localparam logic [3:0] DEBUG_PAGE     = 4'he;
     localparam logic [3:0] EVT_READS_DONE = 4'hf;
-    localparam int SENSOR_W_M1            = SENSOR_WIDTH  - 1;
-    localparam int SENSOR_H_M1            = SENSOR_HEIGHT - 1;
-    localparam int X_BIN_DIV              = (SENSOR_WIDTH  / GRID_SIZE);
-    localparam int Y_BIN_DIV              = (SENSOR_HEIGHT / GRID_SIZE);
-    // Reciprocal-multiply constants: floor(v/D) = (v * M) >> 12 for v < SENSOR_DIM.
-    // M = floor(2^12 / D) + 1 gives exact results; clamp to GRID_SIZE-1 handles edge.
-    localparam int DIV_K                  = 12;
 
-    localparam int X_M                    = (1 << DIV_K) / X_BIN_DIV + 1;
-    localparam int Y_M                    = (1 << DIV_K) / Y_BIN_DIV + 1;
+    localparam int SENSOR_W_M1 = SENSOR_WIDTH  - 1;
+    localparam int SENSOR_H_M1 = SENSOR_HEIGHT - 1;
+    localparam int X_BIN_DIV   = (SENSOR_WIDTH  / GRID_SIZE);
+    localparam int Y_BIN_DIV   = (SENSOR_HEIGHT / GRID_SIZE);
+    localparam int DIV_K       = 12;
+    localparam int X_M         = (1 << DIV_K) / X_BIN_DIV + 1;
+    localparam int Y_M         = (1 << DIV_K) / Y_BIN_DIV + 1;
 
+    // Input decode
     wire [31:0] evt_word = SWAP_INPUT_BYTES
                          ? {data_in[7:0], data_in[15:8], data_in[23:16], data_in[31:24]}
                          : data_in;
@@ -85,166 +77,233 @@ module evt2_decoder #(
     wire [10:0] y_raw    = evt_word[10:0];
     wire        is_cd    = (pkt_type == EVT_CD_OFF) || (pkt_type == EVT_CD_ON);
 
-    logic        have_time_high;
-    logic [27:0] time_high_reg;
-
-    logic [10:0]          x_clamped;
-    logic [10:0]          y_clamped;
-    logic [GRID_BITS-1:0] x_grid;
-    logic [GRID_BITS-1:0] y_grid;
-    logic [10+DIV_K:0]    x_prod_c, y_prod_c;
-    logic [GRID_BITS:0]   x_grid_raw, y_grid_raw;
-
-    logic [17:0]          thresh_reg;
-    logic [16:0]          bin_length_reg;
+    // Grid coordinate combinational logic
+    logic [10:0]          x_clamped,   y_clamped;
+    logic [11+DIV_K:0]    x_prod_c,    y_prod_c;
+    logic [GRID_BITS:0]   x_grid_raw,  y_grid_raw;
+    logic [GRID_BITS-1:0] x_grid,      y_grid;
 
     always_comb begin
+        x_clamped  = (x_raw >= 11'(SENSOR_WIDTH))  ? SENSOR_W_M1[10:0] : x_raw;
+        y_clamped  = (y_raw >= 11'(SENSOR_HEIGHT)) ? SENSOR_H_M1[10:0] : y_raw;
 
-        // For the GenX320, legal X values are 0 through 319.
-        if (x_raw >= 11'(SENSOR_WIDTH))
-            x_clamped = SENSOR_W_M1[10:0];
-        else
-            x_clamped = x_raw;
+        x_prod_c   = 24'(x_clamped * X_M);
+        y_prod_c   = 24'(y_clamped * Y_M);
 
+        x_grid_raw = (GRID_BITS+1)'(x_prod_c >> DIV_K);
+        y_grid_raw = (GRID_BITS+1)'(y_prod_c >> DIV_K);
 
-        // For the GenX320, legal Y values are 0 through 319.
-        if (y_raw >= 11'(SENSOR_HEIGHT))
-            y_clamped = SENSOR_H_M1[10:0];
-        else
-            y_clamped = y_raw;
-
-        x_prod_c   = x_clamped * X_M;
-        y_prod_c   = y_clamped * Y_M;
-
-        // shift the multiplied result down to get the raw grid coordinate.
-        x_grid_raw = x_prod_c >> DIV_K;
-        y_grid_raw = y_prod_c >> DIV_K;
-
-        // clamp the raw grid coordinate to GRID_SIZE-1.
-        x_grid = (x_grid_raw >= GRID_SIZE) ? GRID_SIZE-1 : x_grid_raw;
-        y_grid = (y_grid_raw >= GRID_SIZE) ? GRID_SIZE-1 : y_grid_raw;
+        x_grid = (x_grid_raw >= GRID_SIZE) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(x_grid_raw);
+        y_grid = (y_grid_raw >= GRID_SIZE) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(y_grid_raw);
     end
 
-    // Backpressure only for CD events that generate downstream samples.
+    // Backpressure
     assign data_ready = (!is_cd) || event_ready_i;
 
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            have_time_high     <= 1'b0;
-            time_high_reg      <= '0;
-            x_out              <= '0;
-            y_out              <= '0;
-            ts_out             <= '0;
-            event_valid        <= 1'b0;
-            weight_event_valid <= 1'b0;
-            thresh_event_valid <= 1'b0;
-            evt_reads_done     <= 1'b0;
-            thresh_reg         <= '0;
-            weight_addr_o      <= '0;
-            weight_data_o      <= '0;
-            weight_sram_addr_o <= '0;
-            thresh_data_o      <= '0;
-            thresh_addr_o      <= '0;
-            debug_page_sel     <= '0;
-            boot_req_o         <= 1'b0;
-            reload_req_o       <= 1'b0;
-            debug_req_o        <= 1'b0;
-            bin_length_us    <= '0;
-            bin_length_valid <= 1'b0;
-            bin_length_reg   <= '0;
-        end else begin
-            event_valid        <= 1'b0;
-            weight_event_valid <= 1'b0;
-            thresh_event_valid <= 1'b0;
-            evt_reads_done     <= 1'b0;
-            boot_req_o         <= 1'b0;
-            reload_req_o       <= 1'b0;
-            debug_req_o        <= 1'b0;
-            bin_length_valid   <= 1'b0;
+    // State registers (_q) and next-state signals (_d)
+    logic                  have_time_high_q,      have_time_high_d;
+    logic [27:0]           time_high_reg_q,       time_high_reg_d;
+    logic [GRID_BITS-1:0]  x_out_q,               x_out_d;
+    logic [GRID_BITS-1:0]  y_out_q,               y_out_d;
+    logic [33:0]           ts_out_q,              ts_out_d;
+    logic                  event_valid_q,          event_valid_d;
+    logic                  weight_event_valid_q,   weight_event_valid_d;
+    logic                  thresh_event_valid_q,   thresh_event_valid_d;
+    logic                  evt_reads_done_q,       evt_reads_done_d;
+    logic [17:0]           thresh_reg_q,           thresh_reg_d;
+    logic [10:0]           weight_addr_q,          weight_addr_d;
+    logic [WEIGHT_BITS-1:0] weight_data_q,         weight_data_d;
+    logic [1:0]            weight_sram_addr_q,     weight_sram_addr_d;
+    logic [SCORE_BITS-1:0] thresh_data_q,          thresh_data_d;
+    logic [2:0]            thresh_addr_q,          thresh_addr_d;
+    logic [3:0]            debug_page_sel_q,       debug_page_sel_d;
+    logic                  boot_req_q,             boot_req_d;
+    logic                  reload_req_q,           reload_req_d;
+    logic                  debug_req_q,            debug_req_d;
+    logic [33:0]           bin_length_us_q,        bin_length_us_d;
+    logic                  bin_length_valid_q,     bin_length_valid_d;
+    logic [16:0]           bin_length_reg_q,       bin_length_reg_d;
 
-            if (data_valid && data_ready) begin
-                case (pkt_type)
-                    EVT_TIME_HIGH: begin
-                        have_time_high <= 1'b1;
-                        time_high_reg  <= evt_word[27:0];
-                    end
+    // Next-state combinational block
+    always_comb begin
+        // Default: hold state, clear pulse signals
+        have_time_high_d     = have_time_high_q;
+        time_high_reg_d      = time_high_reg_q;
+        x_out_d              = x_out_q;
+        y_out_d              = y_out_q;
+        ts_out_d             = ts_out_q;
+        event_valid_d        = 1'b0;
+        weight_event_valid_d = 1'b0;
+        thresh_event_valid_d = 1'b0;
+        evt_reads_done_d     = 1'b0;
+        thresh_reg_d         = thresh_reg_q;
+        weight_addr_d        = weight_addr_q;
+        weight_data_d        = weight_data_q;
+        weight_sram_addr_d   = weight_sram_addr_q;
+        thresh_data_d        = thresh_data_q;
+        thresh_addr_d        = thresh_addr_q;
+        debug_page_sel_d     = debug_page_sel_q;
+        boot_req_d           = 1'b0;
+        reload_req_d         = 1'b0;
+        debug_req_d          = 1'b0;
+        bin_length_us_d      = bin_length_us_q;
+        bin_length_valid_d   = 1'b0;
+        bin_length_reg_d     = bin_length_reg_q;
 
-                    EVT_CD_OFF,
-                    EVT_CD_ON: begin
-                        if (!REQUIRE_TIME_HIGH || have_time_high) begin
-                            x_out       <= x_grid;
-                            y_out       <= y_grid;
-                            ts_out      <= {time_high_reg, evt_word[27:22]};
-                            event_valid <= 1'b1;
-                        end
-                    end
+        if (data_valid && data_ready) begin
+            case (pkt_type)
+                EVT_TIME_HIGH: begin
+                    have_time_high_d = 1'b1;
+                    time_high_reg_d  = evt_word[27:0];
+                end
 
-                    EVT_WEIGHT: begin
-                        if (evt_ld_en) begin
-                            weight_data_o      <= evt_word[27:20];
-                            weight_addr_o      <= evt_word[19:9];
-                            weight_sram_addr_o <= evt_word[8:7];
-                            weight_event_valid <= 1'b1;
-                        end
+                EVT_CD_OFF,
+                EVT_CD_ON: begin
+                    if (!REQUIRE_TIME_HIGH || have_time_high_q) begin
+                        x_out_d       = x_grid;
+                        y_out_d       = y_grid;
+                        ts_out_d      = {time_high_reg_q, evt_word[27:22]};
+                        event_valid_d = 1'b1;
                     end
+                end
 
-                    EVT_THRESH_U: begin
-                        if (evt_ld_en) begin
-                            thresh_reg <= evt_word[27:10];
-                        end
+                EVT_WEIGHT: begin
+                    if (evt_ld_en) begin
+                        weight_data_d      = evt_word[27:20];
+                        weight_addr_d      = evt_word[19:9];
+                        weight_sram_addr_d = evt_word[8:7];
+                        weight_event_valid_d = 1'b1;
                     end
+                end
 
-                    EVT_THRESH_L: begin
-                        if (evt_ld_en) begin
-                            thresh_data_o        <= {thresh_reg, evt_word[27:10]};
-                            thresh_addr_o        <= evt_word[9:7];
-                            thresh_event_valid   <= 1'b1;
-                        end
+                EVT_THRESH_U: begin
+                    if (evt_ld_en) begin
+                        thresh_reg_d = evt_word[27:10];
                     end
-                    // matching approach for thresholds
-                    // latch upper bits and wait until lower seen
-                    BIN_LENGTH_U: begin
-                        if (evt_ld_en) begin
-                            bin_length_reg <= evt_word [16:0];
-                        end
-                    end
-                    BIN_LENGTH_L: begin
-                        if (evt_ld_en) begin
-                            bin_length_us        <= {bin_length_reg, evt_word[16:0]};
-                            bin_length_valid     <= 1'b1;
-                        end
-                    end
+                end
 
-                    EVT_READS_DONE: begin
-                        evt_reads_done <= 1'b1;
+                EVT_THRESH_L: begin
+                    if (evt_ld_en) begin
+                        thresh_data_d       = {thresh_reg_q, evt_word[27:10]};
+                        thresh_addr_d       = evt_word[9:7];
+                        thresh_event_valid_d = 1'b1;
                     end
+                end
 
-                    DEBUG_REQ: begin
-                        debug_req_o <= 1'b1;
+                BIN_LENGTH_U: begin
+                    if (evt_ld_en) begin
+                        bin_length_reg_d = evt_word[16:0];
                     end
+                end
 
-                    RELOAD_REQ: begin
-                        reload_req_o <= 1'b1;
+                BIN_LENGTH_L: begin
+                    if (evt_ld_en) begin
+                        bin_length_us_d    = {bin_length_reg_q, evt_word[16:0]};
+                        bin_length_valid_d = 1'b1;
                     end
+                end
 
-                    BOOT_REQ: begin
-                        boot_req_o <= 1'b1;
-                    end
+                EVT_READS_DONE: begin
+                    evt_reads_done_d = 1'b1;
+                end
 
-                    DEBUG_PAGE: begin
-                        debug_page_sel <= evt_word[27:24];
-                    end
+                DEBUG_REQ: begin
+                    debug_req_d = 1'b1;
+                end
 
-                    default: begin
-                        event_valid        <= 1'b0;
-                        thresh_event_valid <= 1'b0;
-                        weight_event_valid <= 1'b0;
-                    end
-                endcase
-            end
+                RELOAD_REQ: begin
+                    reload_req_d = 1'b1;
+                end
+
+                BOOT_REQ: begin
+                    boot_req_d = 1'b1;
+                end
+
+                DEBUG_PAGE: begin
+                    debug_page_sel_d = evt_word[27:24];
+                end
+
+                default: begin
+                    event_valid_d        = 1'b0;
+                    thresh_event_valid_d = 1'b0;
+                    weight_event_valid_d = 1'b0;
+                end
+            endcase
         end
     end
 
-    assign decoder_dbg        = {event_ready_i, data_valid, y_out, x_out, event_valid, data_ready};
-    assign decoder_output_dbg = ts_out[31:0];
+    // Register block: _d -> _q on clock edge
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            have_time_high_q    <= 1'b0;
+            time_high_reg_q     <= '0;
+            x_out_q             <= '0;
+            y_out_q             <= '0;
+            ts_out_q            <= '0;
+            event_valid_q       <= 1'b0;
+            weight_event_valid_q <= 1'b0;
+            thresh_event_valid_q <= 1'b0;
+            evt_reads_done_q    <= 1'b0;
+            thresh_reg_q        <= '0;
+            weight_addr_q       <= '0;
+            weight_data_q       <= '0;
+            weight_sram_addr_q  <= '0;
+            thresh_data_q       <= '0;
+            thresh_addr_q       <= '0;
+            debug_page_sel_q    <= '0;
+            boot_req_q          <= 1'b0;
+            reload_req_q        <= 1'b0;
+            debug_req_q         <= 1'b0;
+            bin_length_us_q     <= '0;
+            bin_length_valid_q  <= 1'b0;
+            bin_length_reg_q    <= '0;
+        end else begin
+            have_time_high_q    <= have_time_high_d;
+            time_high_reg_q     <= time_high_reg_d;
+            x_out_q             <= x_out_d;
+            y_out_q             <= y_out_d;
+            ts_out_q            <= ts_out_d;
+            event_valid_q       <= event_valid_d;
+            weight_event_valid_q <= weight_event_valid_d;
+            thresh_event_valid_q <= thresh_event_valid_d;
+            evt_reads_done_q    <= evt_reads_done_d;
+            thresh_reg_q        <= thresh_reg_d;
+            weight_addr_q       <= weight_addr_d;
+            weight_data_q       <= weight_data_d;
+            weight_sram_addr_q  <= weight_sram_addr_d;
+            thresh_data_q       <= thresh_data_d;
+            thresh_addr_q       <= thresh_addr_d;
+            debug_page_sel_q    <= debug_page_sel_d;
+            boot_req_q          <= boot_req_d;
+            reload_req_q        <= reload_req_d;
+            debug_req_q         <= debug_req_d;
+            bin_length_us_q     <= bin_length_us_d;
+            bin_length_valid_q  <= bin_length_valid_d;
+            bin_length_reg_q    <= bin_length_reg_d;
+        end
+    end
+
+    // Output assignments: _q -> module outputs
+    assign x_out              = x_out_q;
+    assign y_out              = y_out_q;
+    assign ts_out             = ts_out_q;
+    assign event_valid        = event_valid_q;
+    assign weight_event_valid = weight_event_valid_q;
+    assign thresh_event_valid = thresh_event_valid_q;
+    assign evt_reads_done     = evt_reads_done_q;
+    assign weight_addr_o      = weight_addr_q;
+    assign weight_data_o      = weight_data_q;
+    assign weight_sram_addr_o = weight_sram_addr_q;
+    assign thresh_data_o      = thresh_data_q;
+    assign thresh_addr_o      = thresh_addr_q;
+    assign debug_page_sel     = debug_page_sel_q;
+    assign boot_req_o         = boot_req_q;
+    assign reload_req_o       = reload_req_q;
+    assign debug_req_o        = debug_req_q;
+    assign bin_length_us      = bin_length_us_q;
+    assign bin_length_valid   = bin_length_valid_q;
+
+    assign decoder_dbg        = {event_ready_i, data_valid, y_out_q, x_out_q, event_valid_q, data_ready};
+    assign decoder_output_dbg = ts_out_q[31:0];
+
 endmodule
