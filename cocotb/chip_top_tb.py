@@ -695,55 +695,87 @@ def _resolve_bin_files():
 
 # ── Classification-test helpers ───────────────────────────────────────────────
 
-def _sig(dut, path):
-    """Read an internal signal by dotted path; return int or None.
+def _resolve_handle(dut, path):
+    """Resolve a signal handle ONCE. Returns the handle or None.
 
-    Tries two access patterns:
+    Tries:
       RTL: dotted hierarchical attr access (dut.i_chip_core.u_soc.gesture_valid).
-      GL : the netlist is flat — the same signal appears as a TOP-LEVEL wire
-           on `chip_top` with a Verilog-escaped name like
-           `\i_chip_core.u_soc.gesture_valid `. Access via dict-style
-           lookup with the leading backslash and trailing space.
+      GL : flat netlist — signal lives as a TOP-LEVEL escaped wire on chip_top
+           (e.g. `\\i_chip_core.u_soc.gesture_valid `). Access via dict-style
+           lookup. Tries both with and without the trailing space.
+
+    Resolving handles is expensive (allocates VPI objects); calling
+    `dut[name]` in a polling loop leaks memory because every call creates a
+    fresh SimHandleBase. Cache the result and reuse.
     """
-    # Try RTL hierarchy first
+    # RTL hierarchy
     try:
         obj = dut
         for part in path.split("."):
             obj = getattr(obj, part)
-        return int(obj.value)
+        _ = int(obj.value)  # probe so we know it resolves cleanly
+        return obj
     except Exception:
         pass
-    # Try GL escaped name forms
+    # GL escaped names
     for name in (f"\\{path} ", f"\\{path}"):
         try:
-            return int(dut[name].value)
+            h = dut[name]
+            _ = int(h.value)
+            return h
         except Exception:
             continue
     return None
 
 
-def _sig_bus(dut, path, width):
-    """Read a multi-bit signal that may be split into individual escaped
-    wires in the GL netlist (e.g. \\i_chip_core.u_soc.gesture[0] ,
-    \\i_chip_core.u_soc.gesture[1] ). Returns int or None.
+def _resolve_bus_handles(dut, path, width):
+    """Resolve handles for a multi-bit signal, one per bit. Returns a list
+    of handles (length=width) or None if any bit cannot be resolved.
+
+    In GL the netlist may split a bus into per-bit escaped wires
+    (e.g. `\\...gesture[0] `, `\\...gesture[1] `).
     """
-    # RTL form: dotted access to the bus
-    v = _sig(dut, path)
-    if v is not None:
-        return v
-    # GL form: read each bit as a separate escaped wire
-    val = 0
+    # RTL form: try the bus name as a single handle
+    h = _resolve_handle(dut, path)
+    if h is not None:
+        return [h]   # single multi-bit handle; caller can read .value directly
+    # GL form: per-bit handles
+    bits = []
     for i in range(width):
-        bit = None
+        b = None
         for name in (f"\\{path}[{i}] ", f"\\{path}[{i}]"):
             try:
-                bit = int(dut[name].value)
+                hb = dut[name]
+                _ = int(hb.value)
+                b = hb
                 break
             except Exception:
                 continue
-        if bit is None:
+        if b is None:
             return None
-        val |= (bit & 1) << i
+        bits.append(b)
+    return bits
+
+
+def _sig(dut, path):
+    """One-shot signal read (used only for diagnostics, NOT in hot loops).
+    For polling loops use _resolve_handle once and read .value via the
+    cached handle.
+    """
+    h = _resolve_handle(dut, path)
+    return int(h.value) if h is not None else None
+
+
+def _sig_bus(dut, path, width):
+    """One-shot multi-bit read (diagnostics only)."""
+    handles = _resolve_bus_handles(dut, path, width)
+    if handles is None:
+        return None
+    if len(handles) == 1:
+        return int(handles[0].value)
+    val = 0
+    for i, h in enumerate(handles):
+        val |= (int(h.value) & 1) << i
     return val
 
 # Time from end of BOOT_REQ word to evt_ld_en going high.  Driven by
@@ -841,18 +873,45 @@ async def _gesture_monitor(dut, result):
 
     Works in both RTL and GL:
       RTL: dotted hierarchical signal access.
-      GL : flat netlist with escaped names — _sig/_sig_bus handle this.
+      GL : flat netlist with escaped top-level wires on chip_top.
+
+    Resolves the three handles (gesture_valid, gesture[1:0], gesture_confidence)
+    ONCE at startup and caches them. Doing `dut[name]` inside the polling loop
+    leaks VPI handles and gets the process OOM-killed mid-stream — _resolve_*
+    is only called here.
 
     RisingEdge on deep-hierarchy signals is unreliable in Icarus 12 / cocotb
     2.0.x (the VPI callback may not fire for intermediate nets), so we poll
     on the top-level chip clock instead.
     """
+    h_valid = _resolve_handle(dut, "i_chip_core.u_soc.gesture_valid")
+    h_gest  = _resolve_bus_handles(dut, "i_chip_core.u_soc.gesture", 2)
+    h_conf  = _resolve_handle(dut, "i_chip_core.u_soc.gesture_confidence")
+
+    if h_valid is None or h_gest is None or h_conf is None:
+        dut._log.error(
+            "_gesture_monitor: cannot resolve gesture signal handles — "
+            "internal signal access failed. Monitor will see 0 pulses."
+        )
+        return
+
+    dut._log.info(
+        f"_gesture_monitor: handles cached (gesture as "
+        f"{'bus' if len(h_gest)==1 else 'per-bit'}, initial valid="
+        f"{int(h_valid.value)})"
+    )
+
+    def _read_gesture():
+        if len(h_gest) == 1:
+            return int(h_gest[0].value)
+        return (int(h_gest[1].value) << 1) | (int(h_gest[0].value) & 1)
+
     try:
         while True:
             await RisingEdge(dut.clk_PAD)
-            if _sig(dut, "i_chip_core.u_soc.gesture_valid") == 1:
-                g = _sig_bus(dut, "i_chip_core.u_soc.gesture", 2)
-                c = _sig(dut, "i_chip_core.u_soc.gesture_confidence")
+            if int(h_valid.value) == 1:
+                g = _read_gesture()
+                c = int(h_conf.value)
                 result.gestures.append((g, c))
                 result.fired = True
                 dut._log.info(
