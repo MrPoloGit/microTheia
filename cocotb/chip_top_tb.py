@@ -696,14 +696,55 @@ def _resolve_bin_files():
 # ── Classification-test helpers ───────────────────────────────────────────────
 
 def _sig(dut, path):
-    """Read an internal signal by dotted path; return int or None."""
+    """Read an internal signal by dotted path; return int or None.
+
+    Tries two access patterns:
+      RTL: dotted hierarchical attr access (dut.i_chip_core.u_soc.gesture_valid).
+      GL : the netlist is flat — the same signal appears as a TOP-LEVEL wire
+           on `chip_top` with a Verilog-escaped name like
+           `\i_chip_core.u_soc.gesture_valid `. Access via dict-style
+           lookup with the leading backslash and trailing space.
+    """
+    # Try RTL hierarchy first
     try:
         obj = dut
         for part in path.split("."):
             obj = getattr(obj, part)
         return int(obj.value)
     except Exception:
-        return None
+        pass
+    # Try GL escaped name forms
+    for name in (f"\\{path} ", f"\\{path}"):
+        try:
+            return int(dut[name].value)
+        except Exception:
+            continue
+    return None
+
+
+def _sig_bus(dut, path, width):
+    """Read a multi-bit signal that may be split into individual escaped
+    wires in the GL netlist (e.g. \\i_chip_core.u_soc.gesture[0] ,
+    \\i_chip_core.u_soc.gesture[1] ). Returns int or None.
+    """
+    # RTL form: dotted access to the bus
+    v = _sig(dut, path)
+    if v is not None:
+        return v
+    # GL form: read each bit as a separate escaped wire
+    val = 0
+    for i in range(width):
+        bit = None
+        for name in (f"\\{path}[{i}] ", f"\\{path}[{i}]"):
+            try:
+                bit = int(dut[name].value)
+                break
+            except Exception:
+                continue
+        if bit is None:
+            return None
+        val |= (bit & 1) << i
+    return val
 
 # Time from end of BOOT_REQ word to evt_ld_en going high.  Driven by
 # control_fsm.sv:PWR_WAIT_CYCLES (default 1024) + 1 cycle for the FSM to
@@ -779,20 +820,7 @@ class _GestureResult:
         self.gestures   = []           # ordered list of (gesture, confidence)
 
     def dominant(self):
-        """(gesture, confidence) of the most-frequent class. None if empty.
-
-        Two paths:
-          GL: uses _gesture_spans (set by _stream_recording's GL branch),
-              which weights each gesture by how many stream words held it
-              on MISO. spi_wrapper re-latches the same value on every
-              gesture_valid pulse, so duration ≈ pulse count.
-          RTL: counts distinct (gesture, confidence) entries in self.gestures
-              (one per gesture_valid pulse, captured by _gesture_monitor).
-        """
-        if hasattr(self, "_gesture_spans") and self._gesture_spans:
-            winner = max(self._gesture_spans, key=self._gesture_spans.get)
-            conf   = self._last_conf_per_g.get(winner, 0)
-            return winner, conf
+        """(gesture, confidence) of the most-frequent class.  None if empty."""
         if not self.gestures:
             return None, None
         counts = {}
@@ -811,18 +839,19 @@ async def _gesture_monitor(dut, result):
     Background task: poll gesture_valid on every rising chip-clock edge and
     record EVERY pulse (not just the first).
 
+    Works in both RTL and GL:
+      RTL: dotted hierarchical signal access.
+      GL : flat netlist with escaped names — _sig/_sig_bus handle this.
+
     RisingEdge on deep-hierarchy signals is unreliable in Icarus 12 / cocotb
     2.0.x (the VPI callback may not fire for intermediate nets), so we poll
     on the top-level chip clock instead.
-
-    NOTE: must collect every pulse — see _GestureResult docstring for why the
-    first pulse alone is not sufficient to determine the chip's classification.
     """
     try:
         while True:
             await RisingEdge(dut.clk_PAD)
             if _sig(dut, "i_chip_core.u_soc.gesture_valid") == 1:
-                g = _sig(dut, "i_chip_core.u_soc.gesture")
+                g = _sig_bus(dut, "i_chip_core.u_soc.gesture", 2)
                 c = _sig(dut, "i_chip_core.u_soc.gesture_confidence")
                 result.gestures.append((g, c))
                 result.fired = True
@@ -874,19 +903,12 @@ async def _stream_recording(dut, pins, bin_path):
     Stream the full EVT2 .bin file through chip_top's default SPI pins, then
     drain the pipeline and return every gesture_valid pulse the chip emitted.
 
-    Observability differs by mode:
-      RTL: a background task polls i_chip_core.u_soc.gesture_valid on every
-           clock edge and captures every pulse (including during the stream).
-      GLS: internal signals are flattened/escaped after synthesis, so we
-           use the SPI bus's full-duplex MISO channel: enabling capture_miso
-           on the recording stream gives one classification snapshot per
-           32-bit word. spi_wrapper drives MISO with {gesture_confidence,
-           gesture[1:0], 29'b0}, so every transition we observe in those
-           captured words corresponds to a gesture_valid pulse. The final
-           18 stream words are the appended flush events — those bins are
-           near-empty and reliably classify as (Down, 0), so we must
-           observe DURING the stream, not just after, to catch the real
-           gesture pulses before flush events overwrite classification_output.
+    Observability (RTL and GL both use the same methodology):
+      A background task polls i_chip_core.u_soc.gesture_valid on every
+      clock edge and captures every pulse. In RTL the signal is reached
+      via dotted hierarchy; in GL it lives as a top-level escaped wire
+      `\\i_chip_core.u_soc.gesture_valid ` on chip_top (the netlist is
+      flat) — _sig/_sig_bus transparently handle both forms.
 
     No early exit: the chip's sliding-window classifier produces multiple
     gesture_valid pulses per recording (one per bin rollover after the first
@@ -906,81 +928,25 @@ async def _stream_recording(dut, pins, bin_path):
     dut._log.info(f"Streaming {Path(bin_path).name}: {total} words "
                   f"(single CS-low burst)")
 
-    result = _GestureResult()
+    result       = _GestureResult()
+    monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
 
-    if gl:
-        # Capture MISO bits on every SPI clock edge — full-duplex gives us
-        # one classification snapshot per 32-bit word streamed.
-        miso_words = await _spi_stream(dut, pins, words, inter_gap=4,
-                                       capture_miso=True,
-                                       progress_every=10_000, tag=stem)
+    # Single SPI burst with CS held low for the entire stream — matches how
+    # a real GenX320 sensor delivers events: continuous, no CS toggling.
+    # inter_gap=4: SPI re-arm needs ≥ 3 chip cycles minimum.
+    await _spi_stream(dut, pins, words, inter_gap=4,
+                      progress_every=10_000, tag=stem)
 
-        # The last 18 stream words are appended synthetic flush events
-        # (_append_flush_events). They trigger drain-time bin rollovers on
-        # near-empty bins which reliably classify as (Down, 0) — that's not
-        # the chip's verdict on the recording. Skip them.
-        FLUSH_WORDS = 18
-        real_words  = miso_words[:max(0, len(miso_words) - FLUSH_WORDS)]
+    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
+    #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
+    #   • MAC engine settling (~2049)
+    #   • classifier 4-stage pipeline
+    # so the chip has emitted every gesture_valid pulse it will ever emit
+    # for this recording before we cancel the monitor.
+    dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
+    await ClockCycles(dut.clk_PAD, 50_000)
 
-        # Span-weighted histogram. spi_wrapper re-latches classification_output
-        # on every gesture_valid pulse, so MISO does NOT transition between
-        # same-value pulses — but a class that produced many pulses will hold
-        # MISO at its value for many stream words. Span (=run length) is the
-        # right RTL-equivalent of "pulse count".
-        spans = {}                  # gesture (0..3) -> total stream words held
-        last_conf_per_g = {}        # gesture -> most-recent confidence
-        prev_g = None
-        prev_c = None
-        run    = 0
-        n_transitions = 0
-        for miso in real_words:
-            gesture    = (miso >> (DATA_WIDTH - 3)) & 0x3
-            confidence = (miso >> (DATA_WIDTH - 1)) & 0x1
-            if gesture != prev_g:
-                if prev_g is not None:
-                    spans[prev_g] = spans.get(prev_g, 0) + run
-                    result.gestures.append((prev_g, prev_c))
-                    n_transitions += 1
-                prev_g = gesture
-                prev_c = confidence
-                run    = 1
-            else:
-                run += 1
-                prev_c = confidence       # capture most-recent confidence
-            last_conf_per_g[gesture] = confidence
-        if prev_g is not None:
-            spans[prev_g] = spans.get(prev_g, 0) + run
-            result.gestures.append((prev_g, prev_c))
-        result.fired = bool(result.gestures)
-
-        # Stash spans for the dominant() computation below.
-        result._gesture_spans = spans
-        result._last_conf_per_g = last_conf_per_g
-        result._transitions = n_transitions
-
-        span_str = " ".join(
-            f"{GESTURE_NAMES.get(g, '?')}:{v}" for g, v in sorted(spans.items())
-        )
-        dut._log.info(
-            f"  {len(real_words)} stream words → {n_transitions} transitions; "
-            f"spans=({span_str})"
-        )
-
-        # Brief settle for the readback assertion below.
-        await ClockCycles(dut.clk_PAD, 5_000)
-    else:
-        # RTL path: internal-signal monitor runs concurrently with the
-        # stream and captures every pulse.
-        monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
-        await _spi_stream(dut, pins, words, inter_gap=4,
-                          progress_every=10_000, tag=stem)
-        # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
-        #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
-        #   • MAC engine settling (~2049)
-        #   • classifier 4-stage pipeline
-        dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
-        await ClockCycles(dut.clk_PAD, 50_000)
-        monitor_task.cancel()
+    monitor_task.cancel()
 
     if not result.gestures:
         raise AssertionError(
@@ -1155,16 +1121,12 @@ async def test_classify_all_gestures(dut):
         miso = await _spi_xfer(dut, pins, _debug_page(0), tag="miso_readback")
         expected_miso = _expected_miso(last_gesture, last_confidence)
 
-        # In GL mode the histogram was built FROM MISO reads, so asserting
-        # "MISO equals the last sample" is tautological; skip it. The
-        # dominant-class assertion below is the real correctness check.
-        if not gl:
-            assert miso == expected_miso, (
-                f"[{bin_path.name}] MISO mismatch (last latched gesture): "
-                f"got 0x{miso:08X}, expected 0x{expected_miso:08X} "
-                f"(last gesture={GESTURE_NAMES.get(last_gesture, last_gesture)}, "
-                f"confidence={last_confidence})"
-            )
+        assert miso == expected_miso, (
+            f"[{bin_path.name}] MISO mismatch (last latched gesture): "
+            f"got 0x{miso:08X}, expected 0x{expected_miso:08X} "
+            f"(last gesture={GESTURE_NAMES.get(last_gesture, last_gesture)}, "
+            f"confidence={last_confidence})"
+        )
 
         # Correctness assertion uses the DOMINANT class — matches the
         # validation methodology of voxel_bin_core_tb, which also accepts
