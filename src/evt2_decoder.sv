@@ -93,8 +93,8 @@ module evt2_decoder #(
         x_grid_raw = (GRID_BITS+1)'(x_prod_c >> DIV_K);
         y_grid_raw = (GRID_BITS+1)'(y_prod_c >> DIV_K);
 
-        x_grid = (x_grid_raw >= GRID_SIZE) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(x_grid_raw);
-        y_grid = (y_grid_raw >= GRID_SIZE) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(y_grid_raw);
+        x_grid = (x_grid_raw >= (GRID_BITS+1)'(GRID_SIZE)) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(x_grid_raw);
+        y_grid = (y_grid_raw >= (GRID_BITS+1)'(GRID_SIZE)) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(y_grid_raw);
     end
 
     // Backpressure
