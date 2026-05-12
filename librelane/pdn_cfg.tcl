@@ -191,6 +191,14 @@ define_pdn_grid \
 
 add_pdn_connect \
     -grid macro \
+    -layers "Metal1 $::env(PDN_VERTICAL_LAYER)"
+
+add_pdn_connect \
+    -grid macro \
+    -layers "Metal1 $::env(PDN_HORIZONTAL_LAYER)"
+
+add_pdn_connect \
+    -grid macro \
     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
 
 # SRAM macros — all 25 SRAM tiles are covered by the default macro grid above.

@@ -292,16 +292,16 @@ MACROS:
         instances:
             # input_fifo: 1 bank × 4 byte-lanes (col2, rows 0-3)
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram":
-                location: [2900, 600]
+                location: [2300, 600]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram":
-                location: [2900, 1000]
+                location: [2300, 1000]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram":
-                location: [2900, 1400]
+                location: [2900, 600]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram":
-                location: [2900, 1800]
+                location: [2900, 1000]
                 orientation: N
             # thresh_ram: 1 bank × 5 byte-lanes (col2, rows 4-8)
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram":
