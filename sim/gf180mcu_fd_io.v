@@ -18,24 +18,20 @@
 `ifndef GF180MCU_FD_IO_V_SIM
 `define GF180MCU_FD_IO_V_SIM
 
-// Normal CMOS input pad.
-// PAD is declared `input` (not `inout`): these pads are input-only at the
-// chip level, and Verilator does not propagate cocotb writes through an
-// `inout` port with no internal driver — leaving the chip's internal
-// post-pad signals stuck at 0. Declaring `input` makes Verilator treat the
-// port as a straightforward one-way wire so cocotb writes reach the chip.
+// Normal CMOS input pad. PAD declared `inout` to match the upstream PDK
+// signature and chip_top's port direction. Y = PAD passes through.
 module gf180mcu_fd_io__in_c (PU, PD, PAD, Y, DVDD, DVSS, VDD, VSS);
     input  PU, PD;
-    input  PAD;
+    inout  PAD;
     output Y;
     inout  DVDD, DVSS, VDD, VSS;
     assign Y = PAD;
 endmodule
 
-// Schmitt-trigger input pad (same input-only fix as in_c)
+// Schmitt-trigger input pad
 module gf180mcu_fd_io__in_s (PU, PD, PAD, Y, DVDD, DVSS, VDD, VSS);
     input  PU, PD;
-    input  PAD;
+    inout  PAD;
     output Y;
     inout  DVDD, DVSS, VDD, VSS;
     assign Y = PAD;

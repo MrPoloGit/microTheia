@@ -216,16 +216,19 @@ sim-gl-verilator: ## Run gate-level simulation with Verilator (faster than Icaru
 .PHONY: sim-gl-verilator
 
 # Run the 4 gesture classifications in parallel, one process per core.
-# Each gets its own SIM_BUILD dir, log file, and results.xml so they don't
-# clobber each other. The 5 pin-level tests run only in the first gesture's
-# process to avoid duplicating their wall time across 4 parallel runs.
-# Combined with Verilator this brings the full 4-gesture validation from
-# ~27h (Icarus, sequential) down to ~3-4h.
-sim-gl-parallel: ## Run all 4 gestures in parallel with Verilator (1 core per gesture)
+# Each gets its own SIM_BUILD dir, log file, and results.xml.
+#
+# Uses Icarus, NOT Verilator, because Verilator does not propagate cocotb
+# writes to top-level `inout` ports (clk_PAD/rst_n_PAD/input_PAD) through
+# the IO-pad model's `assign Y = PAD` to the chip-internal post-pad signals.
+# In Verilator GL the chip stays in reset and the SPI never moves. Icarus
+# handles inout deposits correctly. ~7h wall time per gesture; 4 in
+# parallel ≈ 7h total.
+sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gesture)
 	@mkdir -p logs
-	@echo "Launching 4 parallel GL classify runs (gestures 0-3, Verilator) …"
+	@echo "Launching 4 parallel GL classify runs (gestures 0-3, Icarus) …"
 	@set -e ; for g in 0 1 2 3 ; do \
-		LD_LIBRARY_PATH="" SIM=verilator GL=1 \
+		LD_LIBRARY_PATH="" SIM=icarus GL=1 \
 		  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
 		  GESTURE_INDICES=$$g \
 		  COCOTB_TEST_FILTER=test_classify_all_gestures \

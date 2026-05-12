@@ -115,20 +115,10 @@ def _debug_page(page):
 # ── Input pin shadow ──────────────────────────────────────────────────────────
 
 class InputPins:
-    """Shadow register so individual bits of input_PAD can be set.
-
-    Verilator quirk: cocotb writes to a top-level `inout` port do not
-    propagate through the internal IO-pad model — `dut.input_PAD.value` is
-    visible from the outside but the chip's post-pad `input_in[]` bus stays
-    at 0. Workaround: also write directly to the chip-internal escaped
-    wires `\\i_chip_core.input_in[i] `. In RTL mode the internal handles
-    resolve to the same logical signal so the dual write is harmless; in
-    GL mode it's the only way the chip actually sees the bits.
-    """
+    """Shadow register so individual bits of input_PAD can be set."""
 
     def __init__(self, width=12):
         self._v = 0
-        self._internal_bits = None   # lazy-resolved chip-side handles
 
     def set(self, idx, val):
         if val:
@@ -138,12 +128,6 @@ class InputPins:
 
     def drive(self, dut):
         dut.input_PAD.value = self._v
-        # Resolve once; write to each bit on every drive call.
-        if self._internal_bits is None:
-            self._internal_bits = _resolve_bus_handles(dut, "i_chip_core.input_in", 12)
-        if self._internal_bits is not None and len(self._internal_bits) > 1:
-            for i, h in enumerate(self._internal_bits):
-                h.value = (self._v >> i) & 1
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
 
