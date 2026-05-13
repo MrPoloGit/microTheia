@@ -77,7 +77,7 @@ class RamModel:
         self.dut.weight_data_flat.value = 0
 
         # Pipeline register: data captured this cycle is driven NEXT cycle.
-        # This matches gf180_sram_1r1w behaviour — rd_valid_i/rd_addr_i are
+        # This matches sram_wrapper behaviour — rd_valid_i/rd_addr_i are
         # registered at posedge, data appears one cycle later.  ReadOnly()
         # sees post-NBA state (rd_en goes high in the *same* timestep as
         # the start pulse), so without this pipeline the model is 1 cycle

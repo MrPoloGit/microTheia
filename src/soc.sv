@@ -24,6 +24,11 @@ module soc #(
     parameter int SCORE_BITS           = COUNTER_BITS + WEIGHT_BITS +
                                          $clog2(READOUT_BINS * GRID_SIZE * GRID_SIZE) + 1
 )(
+`ifdef USE_POWER_PINS
+    inout  wire VDD,
+    inout  wire VSS,
+`endif
+
     input  logic clk,
     input  logic rst,
     input  logic MOSI, //master out slave in (from off chip to in chip)
@@ -76,6 +81,10 @@ module soc #(
         .NUM_CLASSES      (NUM_CLASSES),
         .SCORE_BITS       (SCORE_BITS)
     ) u_core ( 
+`ifdef USE_POWER_PINS
+        .VDD                        (VDD),
+        .VSS                        (VSS),
+`endif
         .clk                        (clk),
         .rst                        (rst),
         .evt_word                   (evt_word),

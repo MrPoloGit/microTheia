@@ -304,7 +304,7 @@ def run_rtl_sim(bin_path: Path, config_name: str):
     # Mirror the explicit source list from the Makefile sim target — avoids
     # pulling in chip_top.sv which requires slot_defines.svh not present here.
     voxel_srcs = [
-        "src/gf180_sram_1r1w.sv",
+        "src/sram_wrapper.sv",
         "src/voxel_binning.sv",
         "src/voxel_bin_core.sv",
         "src/voxel_bin_top.sv",
