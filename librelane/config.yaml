@@ -293,32 +293,32 @@ MACROS:
             # input_fifo: 1 bank × 4 byte-lanes (col2, rows 0-3)
             # input_fifo: 1 bank × 4 byte-lanes (col2, rows 0-3)
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram":
-                location: [1094.6, 452]
+                location: [1700, 1000]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram":
-                location: [1094.6, 696.93]
+                location: [1700, 1300]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram":
-                location: [1094.6, 941.86]
+                location: [1700, 1600]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram":
-                location: [1094.6, 1186.79]
+                location: [1700, 1900]
                 orientation: N
             # thresh_ram: 1 bank × 5 byte-lanes (col2, rows 4-8)
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram":
-                location: [1094.6, 1431.72]
+                location: [1700, 2200]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[1].sel.u_sram":
-                location: [1094.6, 1676.65]
+                location: [1700, 2500]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[2].sel.u_sram":
-                location: [1094.6, 1921.58]
+                location: [1700, 2800]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[3].sel.u_sram":
-                location: [1094.6, 2166.51]
+                location: [1700, 3100]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[4].sel.u_sram":
-                location: [1094.6, 2411.44]
+                location: [1700, 3400]
                 orientation: N
 
     gf180mcu_ocd_ip_sram__sram512x8m8wm1:
@@ -355,55 +355,55 @@ MACROS:
         instances:
             # weight_ram[0..3]: 4 RAMs × 2 banks — col0 (x=452) rows 0-7
             "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 452]
+                location: [500, 452]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 987.81]
+                location: [500, 987.81]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 1523.62]
+                location: [500, 1523.62]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 2059.43]
+                location: [500, 2059.43]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 2595.24]
+                location: [500, 2595.24]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 3131.05]
+                location: [500, 3131.05]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 3666.86]
+                location: [500, 3666.86]
                 orientation: N
             "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [452, 4202.67]
+                location: [500, 4202.67]
                 orientation: N
             # feature_ram: 2 banks × 2 byte-lanes — col1 (x=773.3) rows 0-3
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [773.3, 452]
-                orientation: N
+                location: [2800, 452]
+                orientation: S
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
-                location: [773.3, 987.81]
-                orientation: N
+                location: [2800, 987.81]
+                orientation: S
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [773.3, 1523.62]
-                orientation: N
+                location: [2800, 1523.62]
+                orientation: S
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
-                location: [773.3, 2059.43]
-                orientation: N
+                location: [2800, 2059.43]
+                orientation: S
             # counter_mem: 2 banks × 2 byte-lanes — col1 (x=773.3) rows 4-7
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [773.3, 2595.24]
-                orientation: N
+                location: [2800, 2595.24]
+                orientation: S
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
-                location: [773.3, 3131.05]
-                orientation: N
+                location: [2800, 3131.05]
+                orientation: S
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [773.3, 3666.86]
-                orientation: N
+                location: [2800, 3666.86]
+                orientation: S
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
-                location: [773.3, 4202.67]
-                orientation: N
+                location: [2800, 4202.67]
+                orientation: S
 # Halo size around macros while cutting rows.
 # Workaround for: https://github.com/The-OpenROAD-Project/OpenROAD/issues/8868
 FP_MACRO_HORIZONTAL_HALO: 10
