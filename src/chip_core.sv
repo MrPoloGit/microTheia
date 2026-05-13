@@ -85,6 +85,10 @@ module chip_core #(
         .WEIGHT_BITS(8),
         .NUM_CLASSES(4)
     ) u_soc (
+        `ifdef USE_POWER_PINS
+        .VDD(VDD),
+        .VSS(VSS),
+        `endif
         .clk(clk),
         .rst(!rst_n), //active low here and then no downstream module need to be adjusted
         .MOSI(MOSI_wire), //master out slave in (from off chip to in chip)

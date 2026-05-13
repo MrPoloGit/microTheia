@@ -30,11 +30,16 @@
 //   CEN returns to 1, silently suppressing every access.  The `ifndef SYNTHESIS
 //   block below is a cycle-accurate behavioral replacement for simulation.
 
-module gf180_sram_1r1w #(
+module sram_wrapper #(
     parameter int             width_p    = 8,
     parameter int             depth_p    = 512,
     parameter [8*128-1:0]     filename_p = ""
 )(
+`ifdef USE_POWER_PINS
+    inout  wire                           VDD,
+    inout  wire                           VSS,
+`endif
+
     input  logic                          clk_i,
     input  logic                          reset_i,
 
@@ -149,12 +154,6 @@ module gf180_sram_1r1w #(
     logic [BYTES*8-1:0] wr_data_pad;
     assign wr_data_pad = {{(BYTES*8 - width_p){1'b0}}, wr_data_i};
 
-    // Supply nets for inout VDD/VSS macro ports (Icarus requires wires, not literals)
-`ifdef USE_POWER_PINS
-    wire sram_vdd = 1'b1;
-    wire sram_vss = 1'b0;
-`endif
-
     // Macro tiles: NUM_BANKS banks × BYTES byte-lane macros
     genvar b, byte_i;
     generate
@@ -180,8 +179,8 @@ module gf180_sram_1r1w #(
                 if (MACRO_DEPTH == 256) begin : sel
                     gf180mcu_ocd_ip_sram__sram256x8m8wm1 u_sram (
 `ifdef USE_POWER_PINS
-                        .VDD (sram_vdd),
-                        .VSS (sram_vss),
+                        .VDD (VDD),
+                        .VSS (VSS),
 `endif
                         .CLK (clk_i),
                         .CEN (cen_w),
@@ -194,8 +193,8 @@ module gf180_sram_1r1w #(
                 end else if (MACRO_DEPTH == 512) begin : sel
                     gf180mcu_ocd_ip_sram__sram512x8m8wm1 u_sram (
 `ifdef USE_POWER_PINS
-                        .VDD (sram_vdd),
-                        .VSS (sram_vss),
+                        .VDD (VDD),
+                        .VSS (VSS),
 `endif
                         .CLK (clk_i),
                         .CEN (cen_w),
@@ -208,8 +207,8 @@ module gf180_sram_1r1w #(
                 end else begin : sel  // MACRO_DEPTH == 1024
                     gf180mcu_ocd_ip_sram__sram1024x8m8wm1 u_sram (
 `ifdef USE_POWER_PINS
-                        .VDD (sram_vdd),
-                        .VSS (sram_vss),
+                        .VDD (VDD),
+                        .VSS (VSS),
 `endif
                         .CLK (clk_i),
                         .CEN (cen_w),

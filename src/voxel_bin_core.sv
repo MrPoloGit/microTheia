@@ -27,6 +27,11 @@ module voxel_bin_core #(
     parameter int SCORE_BITS        = COUNTER_BITS + WEIGHT_BITS +
                                       $clog2(READOUT_BINS * GRID_SIZE * GRID_SIZE) + 1
 )(
+`ifdef USE_POWER_PINS
+    inout  wire         VDD,
+    inout  wire         VSS,
+`endif
+
     input  logic        clk,
     input  logic        rst,
 
@@ -240,6 +245,10 @@ module voxel_bin_core #(
         .FIFO_DEPTH(FIFO_DEPTH),
         .DATA_WIDTH(DATA_WIDTH)
     ) u_input_fifo (
+`ifdef USE_POWER_PINS
+        .VDD        (VDD),
+        .VSS        (VSS),
+`endif
         .clk_i      (clk),
         .reset_i    (rst),
         .data_i     (evt_word),
@@ -300,6 +309,10 @@ module voxel_bin_core #(
         .READOUT_BINS (READOUT_BINS),
         .COUNTER_BITS (COUNTER_BITS)
     ) u_voxel_binning (
+`ifdef USE_POWER_PINS
+        .VDD             (VDD),
+        .VSS             (VSS),
+`endif
         .clk             (clk),
         .rst             (rst),
         .event_valid     (dec_event_valid),
@@ -322,10 +335,14 @@ module voxel_bin_core #(
     // ------------------------------------------------------------------
     // Feature RAM (written by binner readout, read by MAC engine)
     // ------------------------------------------------------------------
-    gf180_sram_1r1w #(
+    sram_wrapper #(
         .width_p(COUNTER_BITS),
         .depth_p(FEATURE_COUNT)
     ) u_feature_ram (
+`ifdef USE_POWER_PINS
+        .VDD        (VDD),
+        .VSS        (VSS),
+`endif
         .clk_i      (clk),
         .reset_i    (rst),
         .wr_valid_i (binner_readout_valid),
@@ -342,10 +359,14 @@ module voxel_bin_core #(
     genvar g;
     generate
         for (g = 0; g < NUM_CLASSES; g++) begin : gen_weight_ram
-            gf180_sram_1r1w #(
+            sram_wrapper #(
                 .width_p(WEIGHT_BITS),
                 .depth_p(FEATURE_COUNT)
             ) u_weight_ram (
+`ifdef USE_POWER_PINS
+                .VDD        (VDD),
+                .VSS        (VSS),
+`endif
                 .clk_i      (clk),
                 .reset_i    (rst),
                 .wr_valid_i (weight_wr_valid_gated && (dec_weight_sram_addr_o == 2'(g))),
@@ -361,10 +382,14 @@ module voxel_bin_core #(
     // ------------------------------------------------------------------
     // Threshold SRAM (writable at runtime; addr 0-3 = class, 4-7 = diff)
     // ------------------------------------------------------------------
-    gf180_sram_1r1w #(
+    sram_wrapper #(
         .width_p(SCORE_BITS),
         .depth_p(2 * NUM_CLASSES)
     ) u_thresh_ram (
+`ifdef USE_POWER_PINS
+        .VDD        (VDD),
+        .VSS        (VSS),
+`endif
         .clk_i      (clk),
         .reset_i    (rst),
         .wr_valid_i (thresh_wr_valid_gated),

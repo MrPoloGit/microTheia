@@ -23,6 +23,11 @@ module voxel_binning #(
     parameter  int COUNTER_BITS   = 16,
     localparam int RO_INDEX_WIDTH = READOUT_BINS*GRID_SIZE*GRID_SIZE
 )(
+`ifdef USE_POWER_PINS
+    inout  wire                               VDD,
+    inout  wire                               VSS,
+`endif
+
     input  logic                              clk,
     input  logic                              rst,
     input  logic                              event_valid,
@@ -92,10 +97,14 @@ module voxel_binning #(
     logic [MEM_ADDR_BITS-1:0] sram_rd_addr;
     logic [COUNTER_BITS-1:0] sram_rd_data;
 
-    gf180_sram_1r1w #(
+    sram_wrapper #(
         .width_p (COUNTER_BITS),
         .depth_p (TOTAL_CELLS)
     ) u_counter_mem (
+`ifdef USE_POWER_PINS
+        .VDD        (VDD),
+        .VSS        (VSS),
+`endif
         .clk_i      (clk),
         .reset_i    (rst),
         .wr_valid_i (sram_wr_valid),

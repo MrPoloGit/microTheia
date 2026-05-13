@@ -1472,7 +1472,7 @@ def chip_top_runner():
             proj_path / "../src/spi_wrapper.sv",
             proj_path / "../src/control_fsm.sv",
             proj_path / "../src/evt2_decoder.sv",
-            proj_path / "../src/gf180_sram_1r1w.sv",
+            proj_path / "../src/sram_wrapper.sv",
             proj_path / "../src/input_fifo.sv",
             proj_path / "../src/selectable_debug.sv",
             proj_path / "../src/voxel_bin_core.sv",
