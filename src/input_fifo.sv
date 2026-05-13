@@ -5,7 +5,13 @@
 module input_fifo #(
     parameter int FIFO_DEPTH = 256,
     parameter int DATA_WIDTH = 32
-)(  input  logic                  clk_i,
+)(  
+`ifdef USE_POWER_PINS
+    inout  wire                   VDD,
+    inout  wire                   VSS,
+`endif
+
+    input  logic                  clk_i,
     input  logic                  reset_i,
     input  logic [DATA_WIDTH-1:0] data_i,
     input  logic                  ready_i,
@@ -70,10 +76,14 @@ module input_fifo #(
         (pop & (tail_count_q != 0)) | read_deferred_q
     );
 
-    gf180_sram_1r1w #(
+    sram_wrapper #(
         .width_p(DATA_WIDTH),
         .depth_p(depth_p)
     ) u_fifo_mem (
+`ifdef USE_POWER_PINS
+        .VDD        (VDD),
+        .VSS        (VSS),
+`endif
         .clk_i      (clk_i),
         .reset_i    (reset_i),
         .wr_valid_i (write_to_ram),

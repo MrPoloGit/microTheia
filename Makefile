@@ -160,14 +160,14 @@ sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	fi
 .PHONY: sim
 
-# SRCS="src/gf180_sram_1r1w.sv src/voxel_*.sv src/input_fifo.sv src/evt2_decoder.sv src/control_fsm.sv src/selectable_debug.sv src/spi_wrapper.sv src/verilog_spi/*.v"; \
+# SRCS="src/sram_wrapper.sv src/voxel_*.sv src/input_fifo.sv src/evt2_decoder.sv src/control_fsm.sv src/selectable_debug.sv src/spi_wrapper.sv src/verilog_spi/*.v"; \
 
 sim-fast: ## Run voxel_bin_core sim with small fast-sim config (8x8 grid, N=8, 4 bins)
 	$(MAKE) sim DUT=voxel_bin_core CONFIG=voxel_sim_fast
 .PHONY: sim-fast
 
 sim-all: ## Test all the modules against Makefile compile args
-	$(MAKE) sim DUT=gf180_sram_1r1w CONFIG=gf180_sram_1r1w
+	$(MAKE) sim DUT=sram_wrapper CONFIG=sram_wrapper
 	$(MAKE) sim DUT=input_fifo
 	$(MAKE) sim DUT=evt2_decoder
 	$(MAKE) sim DUT=voxel_gesture_classifier
@@ -178,7 +178,7 @@ sim-all: ## Test all the modules against Makefile compile args
 
 SLOT_UPPER    := $(shell echo $(SLOT) | tr 'a-z' 'A-Z')
 CHIP_TOP_SRCS := src/chip_top.sv src/chip_core.sv src/soc.sv src/spi_wrapper.sv \
-    			 src/control_fsm.sv src/evt2_decoder.sv src/gf180_sram_1r1w.sv src/input_fifo.sv \
+    			 src/control_fsm.sv src/evt2_decoder.sv src/sram_wrapper.sv src/input_fifo.sv \
     			 src/selectable_debug.sv src/voxel_bin_core.sv src/voxel_binning.sv \
     			 src/voxel_gesture_classifier.sv src/voxel_mac_engine.sv \
     			 third_party/verilog_spi/spi_module.v third_party/verilog_spi/pos_edge_det.v third_party/verilog_spi/neg_edge_det.v \

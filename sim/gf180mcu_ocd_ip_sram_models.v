@@ -7,7 +7,7 @@
 // instantiates them cannot be simulated without a behavioural model.
 //
 // Functional behaviour (matches the synthesis-path expectations in
-// src/gf180_sram_1r1w.sv):
+// src/sram_wrapper.sv):
 //   * Synchronous on CLK rising edge.
 //   * CEN=0   -> chip enabled this cycle.
 //   * GWEN=0  -> write D into A; WEN[i]=0 enables byte i (active low).
@@ -17,7 +17,7 @@
 //
 // The model omits the FD-IP "clk_dly" timing block (which caused functional
 // reads to be silently dropped under cocotb / NextTimeStep — see comments
-// in src/gf180_sram_1r1w.sv). Behaviour here is plain synchronous SRAM.
+// in src/sram_wrapper.sv). Behaviour here is plain synchronous SRAM.
 
 `timescale 1ns/1ps
 `ifndef GF180MCU_OCD_IP_SRAM_MODELS_V

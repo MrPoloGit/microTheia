@@ -3,7 +3,7 @@ src/chip_core.sv
 src/control_fsm.sv
 # src/chip_top.sv  -- requires IO pad models; use 'make sim-chip-top' instead
 src/evt2_decoder.sv
-src/gf180_sram_1r1w.sv
+src/sram_wrapper.sv
 src/input_fifo.sv
 src/selectable_debug.sv
 # src/slot_defines.svh  -- header only, included by chip_top.sv

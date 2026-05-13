@@ -127,7 +127,7 @@ VERILOG_FILES:
     - dir::../src/voxel_mac_engine.sv
     - dir::../src/voxel_gesture_classifier.sv
     - dir::../src/selectable_debug.sv
-    - dir::../src/gf180_sram_1r1w.sv
+    - dir::../src/sram_wrapper.sv
     - dir::../third_party/verilog_spi/spi_module.v
     - dir::../third_party/verilog_spi/spi2.v
     - dir::../third_party/verilog_spi/clock_divider.v
