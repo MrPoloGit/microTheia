@@ -8,6 +8,7 @@ PDK ?= gf180mcuD
 PDK_TAG ?= 1.8.0
 SCL ?= gf180mcu_as_sc_mcu7t3v3
 AVALON_REPO ?= https://github.com/AvalonSemiconductors/gf180mcu_as_sc_mcu7t3v3.git
+OCD_SRAM_REPO ?= https://github.com/RTimothyEdwards/gf180mcu_ocd_ip_sram.git
 
 AVAILABLE_SLOTS = 1x1 0p5x1 1x0p5 0p5x0p5
 DEFAULT_SLOT = 1x1
@@ -25,16 +26,10 @@ endif
 
 .DEFAULT_GOAL := help
 
+# Select design to test
 SIM_DUTS = $(strip $(DUT))
 
 SV_SRCS := $(shell find src -name "*.sv")
-
-help: ## Show this help message
-	@echo 'Usage: make [target]'
-	@echo ''
-	@echo 'Available targets:'
-	@grep -E '^[a-zA-Z0-9_-]+:[^#]*## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":[^#]*## "}; {printf "  %-20s %s\n", $$1, $$2}'
-.PHONY: help
 
 # Simulation configuration
 CONFIG ?= voxel_default
@@ -47,6 +42,13 @@ ICE40_MAKEFILE := ice40/ice40.mk
 # Example: make sim DUT=voxel_bin_core_parallel TB=voxel_bin_core
 TB ?= $(DUT)
 
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Available targets:'
+	@grep -E '^[a-zA-Z0-9_-]+:[^#]*## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":[^#]*## "}; {printf "  %-20s %s\n", $$1, $$2}'
+.PHONY: help
+
 all: librelane ## Build the project (runs LibreLane)
 .PHONY: all
 
@@ -54,8 +56,6 @@ clone-pdk: ## Clone the GF180MCU PDK repository
 	rm -rf $(MAKEFILE_DIR)/gf180mcu
 	git clone https://github.com/wafer-space/gf180mcu.git $(MAKEFILE_DIR)/gf180mcu --depth 1 --branch ${PDK_TAG}
 .PHONY: clone-pdk
-
-OCD_SRAM_REPO ?= https://github.com/RTimothyEdwards/gf180mcu_ocd_ip_sram.git
 
 clone-ocd-sram: ## Clone 3.3V OCD SRAM macros and install into gf180mcu/gf180mcuD/libs.ref/gf180mcu_ocd_ip_sram/
 	@if [ ! -d $(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.ref ]; then \
@@ -92,19 +92,19 @@ clone-avalon-pdk: ## Merge Avalon 3.3V std cell library into gf180mcu/gf180mcuD/
 .PHONY: clone-avalon-pdk
 
 librelane: ## Run LibreLane flow (synthesis, PnR, verification)
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk
+	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk
 .PHONY: librelane
 
 librelane-nodrc: ## Run LibreLane flow without DRC checks
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip KLayout.Antenna --skip KLayout.DRC --skip Magic.DRC
+	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip KLayout.Antenna --skip KLayout.DRC --skip Magic.DRC
 .PHONY: librelane-nodrc
 
 librelane-klayoutdrc: ## Run LibreLane flow without magic DRC checks
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip Magic.DRC
+	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip Magic.DRC
 .PHONY: librelane-klayoutdrc
 
 librelane-magicdrc: ## Run LibreLane flow without KLayout DRC checks
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip KLayout.DRC
+	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip KLayout.DRC
 .PHONY: librelane-magicdrc
 
 librelane-openroad: ## Open the last run in OpenROAD
@@ -116,7 +116,7 @@ librelane-klayout: ## Open the last run in KLayout
 .PHONY: librelane-klayout
 
 librelane-padring: ## Only create the padring
-	PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/padring.py librelane/slots/slot_${SLOT}.yaml librelane/config.yaml
+    PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/padring.py librelane/slots/slot_${SLOT}.yaml librelane/config.yaml
 .PHONY: librelane-padring
 
 lint: ## Lint all SystemVerilog files in src
@@ -159,8 +159,6 @@ sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 		done \
 	fi
 .PHONY: sim
-
-# SRCS="src/sram_wrapper.sv src/voxel_*.sv src/input_fifo.sv src/evt2_decoder.sv src/control_fsm.sv src/selectable_debug.sv src/spi_wrapper.sv src/verilog_spi/*.v"; \
 
 sim-fast: ## Run voxel_bin_core sim with small fast-sim config (8x8 grid, N=8, 4 bins)
 	$(MAKE) sim DUT=voxel_bin_core CONFIG=voxel_sim_fast
@@ -208,7 +206,7 @@ sim-chip-top: ## Run chip_top RTL simulation with cocotb
 .PHONY: sim-chip-top
 
 sim-gl: ## Run gate-level simulation with cocotb (Icarus; after copy-final)
-	cd cocotb; LD_LIBRARY_PATH="" GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim-gl
 
 sim-gl-verilator: ## Run gate-level simulation with Verilator (faster than Icarus)
@@ -258,7 +256,7 @@ copy-final: ## Copy final output files from the last run
 render-image: ## Render an image from the final layout (after copy-final)
 	mkdir -p img/
 	PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/lay2img.py final/gds/${TOP}.gds img/${TOP}.png --width 2048 --oversampling 4
-.PHONY: copy-final
+.PHONY: render-image
 
 ice40: ## Run ice40 FPGA build
 	$(MAKE) -C ice40 -f ice40.mk ARCH=$(ARCH)
