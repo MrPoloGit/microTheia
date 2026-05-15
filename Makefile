@@ -246,10 +246,14 @@ sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gestu
 	done
 .PHONY: sim-gl-parallel
 
-STA_RUN ?= RUN_2026-05-11_15-06-35
+STA_RUN ?= RUN_2026-05-15_11-55-49
 STA_CORNER ?= nom_tt_025C_3v30
 STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinsertion/chip_top.pnl.v
-STA_SDF ?= $(MAKEFILE_DIR)/cocotb/chip_top__$(STA_CORNER).icarus.sdf
+# Feed Icarus the raw OpenROAD-emitted SDF. Earlier flow used a hand-stripped
+# .icarus.sdf which dropped the SDF v3.0 backslash escapes in instance names
+# like `bidir\[0\]\.pad`, making Icarus parse them as vector indices and emit
+# "Cannot find bidir[0]" errors. Icarus 13 handles the escaped form natively.
+STA_SDF ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/54-openroad-stapostpnr/$(STA_CORNER)/chip_top__$(STA_CORNER).sdf
 
 sim-gl-sta: ## Run timed STA gate-level simulation with SDF, reset smoke test only
 	cd cocotb; LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \

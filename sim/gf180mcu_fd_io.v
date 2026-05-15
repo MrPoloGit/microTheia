@@ -26,6 +26,11 @@ module gf180mcu_fd_io__in_c (PU, PD, PAD, Y, DVDD, DVSS, VDD, VSS);
     output Y;
     inout  DVDD, DVSS, VDD, VSS;
     assign Y = PAD;
+`ifndef FUNCTIONAL
+    specify
+        (PAD => Y) = (0:0:0, 0:0:0);
+    endspecify
+`endif
 endmodule
 
 // Schmitt-trigger input pad
@@ -35,6 +40,11 @@ module gf180mcu_fd_io__in_s (PU, PD, PAD, Y, DVDD, DVSS, VDD, VSS);
     output Y;
     inout  DVDD, DVSS, VDD, VSS;
     assign Y = PAD;
+`ifndef FUNCTIONAL
+    specify
+        (PAD => Y) = (0:0:0, 0:0:0);
+    endspecify
+`endif
 endmodule
 
 // Bidirectional 24mA pad
@@ -45,6 +55,14 @@ module gf180mcu_fd_io__bi_24t (CS, SL, IE, OE, PU, PD, A, PAD, Y, DVDD, DVSS, VD
     inout  DVDD, DVSS, VDD, VSS;
     assign PAD = OE ? A : 1'bz;
     assign Y   = IE ? PAD : 1'b0;
+`ifndef FUNCTIONAL
+    specify
+        (PAD => Y)  = (0:0:0, 0:0:0);
+        (A   => PAD) = (0:0:0, 0:0:0);
+        (OE  => PAD) = (0:0:0, 0:0:0);
+        (IE  => Y)   = (0:0:0, 0:0:0);
+    endspecify
+`endif
 endmodule
 
 // Analog signal pad — pure passthrough
