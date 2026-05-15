@@ -11,7 +11,7 @@ git clone git@github.com:dolphin-530/microTheia.git
 cd microTheia
 make clone-pdk
 make install-3v3-scl
-git submodule update --init --recursive
+git submodule update --init third_party/verilog_spi
 git lfs pull
 ```
 
