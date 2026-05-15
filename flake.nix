@@ -33,12 +33,6 @@
             nix-eda.overlays.default
             devshell.overlays.default
             librelane.overlays.default
-            (final: prev: {
-              magic = prev.magic.override {
-                version = "8.3.581";
-                sha256 = "sha256-mv6ekJsaFx6m828NenIRa4ryZsR7YHB1vWKI+axgx8U=";
-              };
-            })
           ];
         }
       );
