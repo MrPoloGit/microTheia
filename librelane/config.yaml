@@ -9,20 +9,20 @@ DESIGN_NAME: chip_top
 # STD_CELL_LIBRARY: gf180mcu_as_sc_mcu7t3v3
 # STD_CELL_LIBRARY_OPT: gf180mcu_as_sc_mcu7t3v3
 
-# # GF180MCU IO pad fake sites — LibreLane 3.x reads flat variables, not the
-# # PAD_FAKE_SITES dict from gf180mcu_fd_io/config.tcl (which targets OpenLane 1.x).
-# # Values from libs.tech/librelane/gf180mcu_fd_io/config.tcl: GF_IO_Site=0.1x355,
-# # GF_COR_Site=355x355.
-# PAD_SITE_NAME: GF_IO_Site
-# PAD_CORNER_SITE_NAME: GF_COR_Site
-# PAD_FAKE_SITE_WIDTH: 0.1
-# PAD_FAKE_SITE_HEIGHT: 355
-# PAD_FAKE_CORNER_SITE_WIDTH: 355
-# PAD_FAKE_CORNER_SITE_HEIGHT: 355
+# GF180MCU IO pad fake sites — LibreLane 3.x reads flat variables, not the
+# PAD_FAKE_SITES dict from gf180mcu_fd_io/config.tcl (which targets OpenLane 1.x).
+# Values from libs.tech/librelane/gf180mcu_fd_io/config.tcl: GF_IO_Site=0.1x355,
+# GF_COR_Site=355x355.
+PAD_SITE_NAME: GF_IO_Site
+PAD_CORNER_SITE_NAME: GF_COR_Site
+PAD_FAKE_SITE_WIDTH: 0.1
+PAD_FAKE_SITE_HEIGHT: 355
+PAD_FAKE_CORNER_SITE_WIDTH: 355
+PAD_FAKE_CORNER_SITE_HEIGHT: 355
 
 # # Provide merged GDS so KLayout XOR can check 3.3V std cell layouts
 # EXTRA_GDS:
-#     - pdk_dir::libs.ref/gf180mcu_as_sc_mcu7t3v3/gf180mcu_as_sc_mcu7t3v3__merged.gds
+#     - dir::../libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.ref/gf180mcu_as_sc_mcu7t3v3/gf180mcu_as_sc_mcu7t3v3__merged.gds
 
 VERILOG_FILES:
     - dir::../src/chip_top.sv
@@ -207,16 +207,16 @@ MACROS:
 
     gf180mcu_ocd_ip_sram__sram256x8m8wm1:
         gds:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram256x8m8wm1.gds
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram256x8m8wm1/gf180mcu_ocd_ip_sram__sram256x8m8wm1.gds
         lef:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram256x8m8wm1.lef
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram256x8m8wm1/gf180mcu_ocd_ip_sram__sram256x8m8wm1.lef
         vh:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram256x8m8wm1.blackbox.v
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram256x8m8wm1/gf180mcu_ocd_ip_sram__sram256x8m8wm1.blackbox.v
         lib:
             "*_tt_025C_3v30":
-                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__tt_025C_3v30.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram256x8m8wm1/gf180mcu_ocd_ip_sram__sram256x8m8wm1__tt_025C_3v30.lib
             "*_ff_n40C_3v60":
-                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram256x8m8wm1/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ff_n40C_3v60.lib
             # "*_ss_125C_3v00":
             #     - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ss_125C_3v00.lib
         instances:
@@ -254,16 +254,16 @@ MACROS:
 
     gf180mcu_ocd_ip_sram__sram512x8m8wm1:
         gds:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram512x8m8wm1.gds
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1.gds
         lef:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram512x8m8wm1.lef
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1.lef
         vh:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram512x8m8wm1.blackbox.v
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1.blackbox.v
         lib:
             "*_tt_025C_3v30":
-                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
             "*_ff_n40C_3v60":
-                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
             # "*_ss_125C_3v00":
             #     - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ss_125C_3v00.lib
         # No instances: sram512x8 is declared but not placed in this design.
@@ -271,16 +271,16 @@ MACROS:
 
     gf180mcu_ocd_ip_sram__sram1024x8m8wm1:
         gds:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/gds/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.gds
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.gds
         lef:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lef/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.lef
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.lef
         vh:
-            - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/verilog/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.blackbox.v
+            - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.blackbox.v
         lib:
             "*_tt_025C_3v30":
-                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
             "*_ff_n40C_3v60":
-                - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
             # "*_ss_125C_3v00":
             #     - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ss_125C_3v00.lib
         instances:
