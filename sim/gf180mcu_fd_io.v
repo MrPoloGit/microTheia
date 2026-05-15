@@ -54,3 +54,48 @@ module gf180mcu_fd_io__asig_5p0 (ASIG5V, DVDD, DVSS, VDD, VSS);
 endmodule
 
 `endif
+
+`ifndef GF180MCU_FD_IO_FILLER_CORNER_MISSING_MODELS
+`define GF180MCU_FD_IO_FILLER_CORNER_MISSING_MODELS
+
+module gf180mcu_fd_io__cor (
+    inout DVDD,
+    inout DVSS,
+    inout VDD,
+    inout VSS
+);
+endmodule
+
+module gf180mcu_fd_io__fill10 (
+    inout DVDD,
+    inout DVSS,
+    inout VDD,
+    inout VSS
+);
+endmodule
+
+module gf180mcu_fd_io__fill5 (
+    inout DVDD,
+    inout DVSS,
+    inout VDD,
+    inout VSS
+);
+endmodule
+
+module gf180mcu_fd_io__fill1 (
+    inout DVDD,
+    inout DVSS,
+    inout VDD,
+    inout VSS
+);
+endmodule
+
+module gf180mcu_fd_io__fillnc (
+    inout DVDD,
+    inout DVSS,
+    inout VDD,
+    inout VSS
+);
+endmodule
+
+`endif

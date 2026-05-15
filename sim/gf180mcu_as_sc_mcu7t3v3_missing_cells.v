@@ -59,3 +59,43 @@ module gf180mcu_as_sc_mcu7t3v3__oai211_2 (
 );
     assign Y = ~((A | B) & C & D);
 endmodule
+
+`ifndef GF180MCU_AS_SC_MCU7T3V3_DFXTP_4_MISSING_MODEL
+`define GF180MCU_AS_SC_MCU7T3V3_DFXTP_4_MISSING_MODEL
+
+module gf180mcu_as_sc_mcu7t3v3__dfxtp_4 (
+`ifdef USE_POWER_PINS
+    inout VDD,
+    inout VNW,
+    inout VPW,
+    inout VSS,
+`endif
+    input CLK,
+    input D,
+    output reg Q
+);
+    always @(posedge CLK) begin
+        Q <= D;
+    end
+endmodule
+
+`endif
+
+`ifndef GF180MCU_AS_SC_MCU7T3V3_XOR2_2_MISSING_MODEL
+`define GF180MCU_AS_SC_MCU7T3V3_XOR2_2_MISSING_MODEL
+
+module gf180mcu_as_sc_mcu7t3v3__xor2_2 (
+`ifdef USE_POWER_PINS
+    inout VDD,
+    inout VNW,
+    inout VPW,
+    inout VSS,
+`endif
+    input A,
+    input B,
+    output Y
+);
+    assign Y = A ^ B;
+endmodule
+
+`endif
