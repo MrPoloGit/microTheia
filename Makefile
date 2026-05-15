@@ -7,8 +7,6 @@ PDK_ROOT ?= $(MAKEFILE_DIR)/gf180mcu
 PDK ?= gf180mcuD
 PDK_TAG ?= 1.8.0
 SCL ?= gf180mcu_as_sc_mcu7t3v3
-AVALON_REPO ?= https://github.com/AvalonSemiconductors/gf180mcu_as_sc_mcu7t3v3.git
-OCD_SRAM_REPO ?= https://github.com/RTimothyEdwards/gf180mcu_ocd_ip_sram.git
 
 AVAILABLE_SLOTS = 1x1 0p5x1 1x0p5 0p5x0p5
 DEFAULT_SLOT = 1x1
@@ -29,6 +27,7 @@ endif
 # Select design to test
 SIM_DUTS = $(strip $(DUT))
 
+# System Verilog sources
 SV_SRCS := $(shell find src -name "*.sv")
 
 # Simulation configuration
@@ -57,39 +56,13 @@ clone-pdk: ## Clone the GF180MCU PDK repository
 	git clone https://github.com/wafer-space/gf180mcu.git $(MAKEFILE_DIR)/gf180mcu --depth 1 --branch ${PDK_TAG}
 .PHONY: clone-pdk
 
-clone-ocd-sram: ## Clone 3.3V OCD SRAM macros and install into gf180mcu/gf180mcuD/libs.ref/gf180mcu_ocd_ip_sram/
-	@if [ ! -d $(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.ref ]; then \
-		echo "ERROR: Run 'make clone-pdk' first."; exit 1; \
-	fi
-	$(eval OCD_TMP := $(shell mktemp -d))
-	git clone $(OCD_SRAM_REPO) $(OCD_TMP) --depth 1
-	$(eval OCD_DST := $(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.ref/gf180mcu_ocd_ip_sram)
-	mkdir -p $(OCD_DST)/gds $(OCD_DST)/lef $(OCD_DST)/lib $(OCD_DST)/verilog $(OCD_DST)/spice
-	for cell in sram256x8m8wm1 sram512x8m8wm1 sram1024x8m8wm1; do \
-		src=$(OCD_TMP)/cells/gf180mcu_ocd_ip_sram__$$cell; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.gds        $(OCD_DST)/gds/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.lef        $(OCD_DST)/lef/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.blackbox.v $(OCD_DST)/verilog/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.spice      $(OCD_DST)/spice/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell__*.lib     $(OCD_DST)/lib/; \
-	done
-	rm -rf $(OCD_TMP)
-	@echo "OCD 3.3V SRAMs installed at $(OCD_DST)"
-.PHONY: clone-ocd-sram
-
-clone-avalon-pdk: ## Merge Avalon 3.3V std cell library into gf180mcu/gf180mcuD/
-	@if [ ! -d $(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.ref ]; then \
-		echo "ERROR: Run 'make clone-pdk' first to fetch the base GF180MCU PDK."; exit 1; \
-	fi
-	$(eval AVALON_TMP := $(shell mktemp -d))
-	git clone $(AVALON_REPO) $(AVALON_TMP) --depth 1
-	cp -r $(AVALON_TMP)/pdk/libs.ref/. $(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.ref/
-	cp -r $(AVALON_TMP)/pdk/libs.tech/. $(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.tech/
-	rm -rf $(AVALON_TMP)
-	cp $(MAKEFILE_DIR)/librelane/gf180mcu_as_sc_mcu7t3v3_config.tcl \
-		$(MAKEFILE_DIR)/gf180mcu/gf180mcuD/libs.tech/librelane/gf180mcu_as_sc_mcu7t3v3/config.tcl
-	@echo "Avalon 3.3V library merged into gf180mcu/gf180mcuD/"
-.PHONY: clone-avalon-pdk
+install-3v3-scl: ## Install the 3.3V standard cell library into the PDK
+	git submodule update --init libs/gf180mcu_as_sc_mcu7t3v3 libs/gf180mcu_ocd_ip_sram
+	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.ref/gf180mcu_as_sc_mcu7t3v3 $(PDK_ROOT)/$(PDK)/libs.ref/
+	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.tech/librelane $(PDK_ROOT)/$(PDK)/libs.tech/
+	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.tech/magic $(PDK_ROOT)/$(PDK)/libs.tech/
+	cp $(MAKEFILE_DIR)/librelane/gf180mcu_as_sc_mcu7t3v3_config.tcl $(PDK_ROOT)/$(PDK)/libs.tech/librelane/gf180mcu_as_sc_mcu7t3v3/config.tcl
+.PHONY: install-3v3-scl
 
 librelane: ## Run LibreLane flow (synthesis, PnR, verification)
 	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk
@@ -116,7 +89,7 @@ librelane-klayout: ## Open the last run in KLayout
 .PHONY: librelane-klayout
 
 librelane-padring: ## Only create the padring
-    PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/padring.py librelane/slots/slot_${SLOT}.yaml librelane/config.yaml
+	PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/padring.py librelane/slots/slot_${SLOT}.yaml librelane/config.yaml
 .PHONY: librelane-padring
 
 lint: ## Lint all SystemVerilog files in src
