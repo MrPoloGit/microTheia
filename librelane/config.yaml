@@ -9,16 +9,14 @@ DESIGN_NAME: chip_top
 # STD_CELL_LIBRARY: gf180mcu_as_sc_mcu7t3v3
 # STD_CELL_LIBRARY_OPT: gf180mcu_as_sc_mcu7t3v3
 
-# GF180MCU IO pad fake sites — LibreLane 3.x reads flat variables, not the
-# PAD_FAKE_SITES dict from gf180mcu_fd_io/config.tcl (which targets OpenLane 1.x).
-# Values from libs.tech/librelane/gf180mcu_fd_io/config.tcl: GF_IO_Site=0.1x355,
-# GF_COR_Site=355x355.
+# GF180MCU IO pad fake sites. Override here in case the PDK's
+# libs.tech/librelane/gf180mcu_fd_io/config.tcl does not set PAD_FAKE_SITES.
+# Values: GF_IO_Site = 0.1µm × 355µm, GF_COR_Site = 355µm × 355µm.
 PAD_SITE_NAME: GF_IO_Site
 PAD_CORNER_SITE_NAME: GF_COR_Site
-PAD_FAKE_SITE_WIDTH: 0.1
-PAD_FAKE_SITE_HEIGHT: 355
-PAD_FAKE_CORNER_SITE_WIDTH: 355
-PAD_FAKE_CORNER_SITE_HEIGHT: 355
+PAD_FAKE_SITES:
+    GF_IO_Site: [0.1, 355]
+    GF_COR_Site: [355, 355]
 
 # # Provide merged GDS so KLayout XOR can check 3.3V std cell layouts
 # EXTRA_GDS:
@@ -68,6 +66,28 @@ IGNORE_DISCONNECTED_MODULES:
     - gf180mcu_fd_io__bi_24t
     - gf180mcu_ws_ip__id
     - gf180mcu_ws_ip__logo
+
+# Skip every fill / tap / decap cell from the 3.3V SCL and IO libraries
+# during LVS. The 3.3V flow inserts hundreds of thousands of fillcap_16
+# / tap_2 cells; netgen's partition refinement does not converge in
+# reasonable time at that scale. These cells connect only to power /
+# ground rails, so dropping them does not affect LVS coverage.
+# Requires librelane >= 3.0.0 (see flake.nix).
+LVS_IGNORE_CELLS:
+    # 3.3V standard-cell library
+    - gf180mcu_as_sc_mcu7t3v3__fill_1
+    - gf180mcu_as_sc_mcu7t3v3__fill_2
+    - gf180mcu_as_sc_mcu7t3v3__fill_4
+    - gf180mcu_as_sc_mcu7t3v3__fill_8
+    - gf180mcu_as_sc_mcu7t3v3__fillcap_4
+    - gf180mcu_as_sc_mcu7t3v3__fillcap_8
+    - gf180mcu_as_sc_mcu7t3v3__fillcap_16
+    - gf180mcu_as_sc_mcu7t3v3__tap_2
+    # IO library fill cells
+    - gf180mcu_fd_io__fill1
+    - gf180mcu_fd_io__fill5
+    - gf180mcu_fd_io__fill10
+    - gf180mcu_fd_io__fillnc
 
 # Clock
 CLOCK_PORT: clk_PAD
@@ -261,7 +281,7 @@ MACROS:
             - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1.blackbox.v
         lib:
             "*_tt_025C_3v30":
-                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1__tt_025C_3v30.lib
             "*_ff_n40C_3v60":
                 - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram512x8m8wm1/gf180mcu_ocd_ip_sram__sram512x8m8wm1__ff_n40C_3v60.lib
             # "*_ss_125C_3v00":
@@ -278,7 +298,7 @@ MACROS:
             - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1.blackbox.v
         lib:
             "*_tt_025C_3v30":
-                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
+                - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__tt_025C_3v30.lib
             "*_ff_n40C_3v60":
                 - dir::../libs/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ff_n40C_3v60.lib
             # "*_ss_125C_3v00":
