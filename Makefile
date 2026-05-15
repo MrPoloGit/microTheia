@@ -15,7 +15,7 @@ DEFAULT_SLOT = 1x1
 # Slot can be any of AVAILABLE_SLOTS
 SLOT ?= $(DEFAULT_SLOT)
 
-ifeq ($(SLOT),default)        
+ifeq ($(SLOT),default)
     SLOT = $(DEFAULT_SLOT)
 endif
 
@@ -67,11 +67,11 @@ clone-ocd-sram: ## Clone 3.3V OCD SRAM macros and install into gf180mcu/gf180mcu
 	mkdir -p $(OCD_DST)/gds $(OCD_DST)/lef $(OCD_DST)/lib $(OCD_DST)/verilog $(OCD_DST)/spice
 	for cell in sram256x8m8wm1 sram512x8m8wm1 sram1024x8m8wm1; do \
 		src=$(OCD_TMP)/cells/gf180mcu_ocd_ip_sram__$$cell; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.gds      $(OCD_DST)/gds/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.lef      $(OCD_DST)/lef/; \
+		cp $$src/gf180mcu_ocd_ip_sram__$$cell.gds        $(OCD_DST)/gds/; \
+		cp $$src/gf180mcu_ocd_ip_sram__$$cell.lef        $(OCD_DST)/lef/; \
 		cp $$src/gf180mcu_ocd_ip_sram__$$cell.blackbox.v $(OCD_DST)/verilog/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell.spice    $(OCD_DST)/spice/; \
-		cp $$src/gf180mcu_ocd_ip_sram__$$cell__*.lib   $(OCD_DST)/lib/; \
+		cp $$src/gf180mcu_ocd_ip_sram__$$cell.spice      $(OCD_DST)/spice/; \
+		cp $$src/gf180mcu_ocd_ip_sram__$$cell__*.lib     $(OCD_DST)/lib/; \
 	done
 	rm -rf $(OCD_TMP)
 	@echo "OCD 3.3V SRAMs installed at $(OCD_DST)"

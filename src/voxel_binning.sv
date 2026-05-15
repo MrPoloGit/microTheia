@@ -36,7 +36,7 @@ module voxel_binning #(
     input  logic [33:0]                       ts_in,          // 34-bit EVT2 timestamp (us), valid with event_valid
     input  logic                              force_rollover_i, // pulse high for one cycle to force a bin advance (test use)
     input  logic [33:0]                       bin_length_us,
-    input  logic                              bin_length_valid,  
+    input  logic                              bin_length_valid,
     output logic                              event_ready,
     input  logic                              readout_ready,
     output logic                              readout_start,
@@ -65,8 +65,8 @@ module voxel_binning #(
         end
         else if(bin_length_valid && (bin_length_us != 34'd0)) begin //added non zero check to prevent triggering an infinite loop of bin rollovers when bin length is 0
             bin_duration_ts <= bin_length_us;
-        end        
-    end    
+        end
+    end
 
 
     initial begin
@@ -178,7 +178,7 @@ module voxel_binning #(
                               : completed_bins;
 
         rd_bin_calc = snapshot_start_bin + rd_bin_off;
-        rd_bin_idx  = (rd_bin_calc >= (NUM_BINS)'(NUM_BINS))
+        rd_bin_idx  = (rd_bin_calc >= (BIN_BITS+1)'(NUM_BINS))
                       ? BIN_BITS'(rd_bin_calc - NUM_BINS)
                       : BIN_BITS'(rd_bin_calc);
 
