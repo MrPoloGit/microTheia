@@ -24,6 +24,17 @@ reg state;
 always @(posedge CLK) state <= D;
 assign Q = state;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
+	$setup(posedge D, posedge CLK, 0:0:0);
+	$setup(negedge D, posedge CLK, 0:0:0);
+	$hold(posedge CLK, posedge D, 0:0:0);
+	$hold(posedge CLK, negedge D, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__dfxtn_2(
@@ -40,6 +51,17 @@ module gf180mcu_as_sc_mcu7t3v3__dfxtn_2(
 reg state;
 always @(negedge CLK) state <= D;
 assign Q = state;
+
+
+`ifndef FUNCTIONAL
+specify
+	(negedge CLK => (Q:D)) = (0:0:0, 0:0:0);
+	$setup(posedge D, negedge CLK, 0:0:0);
+	$setup(negedge D, negedge CLK, 0:0:0);
+	$hold(negedge CLK, posedge D, 0:0:0);
+	$hold(negedge CLK, negedge D, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -68,6 +90,17 @@ always @(posedge CLK or negedge RN or negedge SN) begin
 end
 assign Q = q_r;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
+	$setup(posedge D, posedge CLK, 0:0:0);
+	$setup(negedge D, posedge CLK, 0:0:0);
+	$hold(posedge CLK, posedge D, 0:0:0);
+	$hold(posedge CLK, negedge D, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__buff_2(
@@ -81,6 +114,14 @@ module gf180mcu_as_sc_mcu7t3v3__buff_2(
 );
 
 assign Y = A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -96,6 +137,14 @@ module gf180mcu_as_sc_mcu7t3v3__buff_4(
 
 assign Y = A;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__buff_8(
@@ -109,6 +158,14 @@ module gf180mcu_as_sc_mcu7t3v3__buff_8(
 );
 
 assign Y = A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -124,6 +181,14 @@ module gf180mcu_as_sc_mcu7t3v3__buff_12(
 
 assign Y = A;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__clkbuff_4(
@@ -137,6 +202,14 @@ module gf180mcu_as_sc_mcu7t3v3__clkbuff_4(
 );
 
 assign Y = A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -152,6 +225,14 @@ module gf180mcu_as_sc_mcu7t3v3__clkbuff_8(
 
 assign Y = A;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__clkbuff_12(
@@ -165,6 +246,14 @@ module gf180mcu_as_sc_mcu7t3v3__clkbuff_12(
 );
 
 assign Y = A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -180,6 +269,14 @@ module gf180mcu_as_sc_mcu7t3v3__inv_2(
 
 assign Y = !A;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__inv_4(
@@ -194,6 +291,14 @@ module gf180mcu_as_sc_mcu7t3v3__inv_4(
 
 assign Y = !A;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__inv_6(
@@ -207,6 +312,14 @@ module gf180mcu_as_sc_mcu7t3v3__inv_6(
 );
 
 assign Y = !A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -223,6 +336,16 @@ module gf180mcu_as_sc_mcu7t3v3__invz_2(
 
 assign Y = (EN == 1'b1) ? ~A : 1'bz;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge EN => (Y:EN)) = (0:0:0, 0:0:0);
+	(negedge EN => (Y:EN)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__nand2_2(
@@ -237,6 +360,16 @@ module gf180mcu_as_sc_mcu7t3v3__nand2_2(
 );
 
 assign Y = !(A & B);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -253,6 +386,16 @@ module gf180mcu_as_sc_mcu7t3v3__nand2_4(
 
 assign Y = !(A & B);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__nand2b_2(
@@ -267,6 +410,16 @@ module gf180mcu_as_sc_mcu7t3v3__nand2b_2(
 );
 
 assign Y = A | (!B);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -283,6 +436,16 @@ module gf180mcu_as_sc_mcu7t3v3__nand2b_4(
 
 assign Y = A | (!B);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__nand3_2(
@@ -298,6 +461,18 @@ module gf180mcu_as_sc_mcu7t3v3__nand3_2(
 );
 
 assign Y = !(A & B & C);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -316,6 +491,20 @@ module gf180mcu_as_sc_mcu7t3v3__nand4_2(
 
 assign Y = !(A & B & C & D);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__nor2_2(
@@ -330,6 +519,16 @@ module gf180mcu_as_sc_mcu7t3v3__nor2_2(
 );
 
 assign Y = !(A | B);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -346,6 +545,16 @@ module gf180mcu_as_sc_mcu7t3v3__nor2_4(
 
 assign Y = !(A | B);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__nor2b_2(
@@ -361,6 +570,16 @@ module gf180mcu_as_sc_mcu7t3v3__nor2b_2(
 
 assign Y = A & (!B);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__nor2b_4(
@@ -375,6 +594,16 @@ module gf180mcu_as_sc_mcu7t3v3__nor2b_4(
 );
 
 assign Y = A & (!B);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -392,6 +621,18 @@ module gf180mcu_as_sc_mcu7t3v3__nor3_2(
 
 assign Y = !(A | B | C);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__and2_2(
@@ -406,6 +647,16 @@ module gf180mcu_as_sc_mcu7t3v3__and2_2(
 );
 
 assign Y = A & B;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -422,6 +673,16 @@ module gf180mcu_as_sc_mcu7t3v3__and2_4(
 
 assign Y = A & B;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__or2_2(
@@ -436,6 +697,16 @@ module gf180mcu_as_sc_mcu7t3v3__or2_2(
 );
 
 assign Y = A | B;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -452,6 +723,16 @@ module gf180mcu_as_sc_mcu7t3v3__or2_4(
 
 assign Y = A | B;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__xnor2_2(
@@ -467,6 +748,16 @@ module gf180mcu_as_sc_mcu7t3v3__xnor2_2(
 
 assign Y = A == B;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__xnor2_4(
@@ -481,6 +772,16 @@ module gf180mcu_as_sc_mcu7t3v3__xnor2_4(
 );
 
 assign Y = A == B;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -498,6 +799,18 @@ module gf180mcu_as_sc_mcu7t3v3__maj3_2(
 
 assign Y = (A & B) | (A & C) | (B & C);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__maj3_4(
@@ -513,6 +826,18 @@ module gf180mcu_as_sc_mcu7t3v3__maj3_4(
 );
 
 assign Y = (A & B) | (A & C) | (B & C);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -530,6 +855,18 @@ module gf180mcu_as_sc_mcu7t3v3__aoi21_2 (
 
 assign Y = ~((A & B) | C);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__aoi21_4 (
@@ -545,6 +882,18 @@ module gf180mcu_as_sc_mcu7t3v3__aoi21_4 (
 );
 
 assign Y = ~((A & B) | C);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -562,6 +911,18 @@ module gf180mcu_as_sc_mcu7t3v3__aoi21b_2 (
 
 assign Y = ~(((~A) & B) | C);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__aoi21b_4 (
@@ -577,6 +938,18 @@ module gf180mcu_as_sc_mcu7t3v3__aoi21b_4 (
 );
 
 assign Y = ~(((~A) & B) | C);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -594,6 +967,18 @@ module gf180mcu_as_sc_mcu7t3v3__ao21_2 (
 
 assign Y = (A & B) | C;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__ao21_4 (
@@ -609,6 +994,18 @@ module gf180mcu_as_sc_mcu7t3v3__ao21_4 (
 );
 
 assign Y = (A & B) | C;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -626,6 +1023,18 @@ module gf180mcu_as_sc_mcu7t3v3__ao21b_2 (
 
 assign Y = ((~A) & B) | C;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__ao21b_4 (
@@ -641,6 +1050,18 @@ module gf180mcu_as_sc_mcu7t3v3__ao21b_4 (
 );
 
 assign Y = ((~A) & B) | C;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -659,6 +1080,20 @@ module gf180mcu_as_sc_mcu7t3v3__aoi22_2 (
 
 assign Y = ~((A & B) | (C & D));
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__aoi22_4 (
@@ -675,6 +1110,20 @@ module gf180mcu_as_sc_mcu7t3v3__aoi22_4 (
 );
 
 assign Y = ~((A & B) | (C & D));
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -693,6 +1142,20 @@ module gf180mcu_as_sc_mcu7t3v3__ao22_2 (
 
 assign Y = (A & B) | (C & D);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__ao22_4 (
@@ -709,6 +1172,20 @@ module gf180mcu_as_sc_mcu7t3v3__ao22_4 (
 );
 
 assign Y = (A & B) | (C & D);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -727,6 +1204,20 @@ module gf180mcu_as_sc_mcu7t3v3__aoi31_2 (
 
 assign Y = ~((A & B & C) | D);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__aoi31_4 (
@@ -743,6 +1234,20 @@ module gf180mcu_as_sc_mcu7t3v3__aoi31_4 (
 );
 
 assign Y = ~((A & B & C) | D);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 
@@ -761,6 +1266,20 @@ module gf180mcu_as_sc_mcu7t3v3__ao31_2 (
 
 assign Y = (A & B & C) | D;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__ao31_4 (
@@ -778,6 +1297,20 @@ module gf180mcu_as_sc_mcu7t3v3__ao31_4 (
 
 assign Y = (A & B & C) | D;
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__mux2_2(
@@ -794,6 +1327,18 @@ module gf180mcu_as_sc_mcu7t3v3__mux2_2(
 
 assign Y = (S&B) | ((!S)&A);
 
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge S => (Y:S)) = (0:0:0, 0:0:0);
+	(negedge S => (Y:S)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
 endmodule
 
 module gf180mcu_as_sc_mcu7t3v3__mux2_4(
@@ -809,6 +1354,18 @@ module gf180mcu_as_sc_mcu7t3v3__mux2_4(
 );
 
 assign Y = (S&B) | ((!S)&A);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge S => (Y:S)) = (0:0:0, 0:0:0);
+	(negedge S => (Y:S)) = (0:0:0, 0:0:0);
+endspecify
+`endif
 
 endmodule
 

@@ -1481,10 +1481,18 @@ def chip_top_runner():
         # Post-synthesis (.nl.v) has NO power pins; post-PnR (.pnl.v) does.
         # Auto-detect from filename so the same runner works for both.
         use_power_pins = gl_netlist.name.endswith(".pnl.v")
-        # `functional` (lowercase) is what gf180mcu_fd_io.v gates on for its
-        # behavioural model. Pass both case variants so any cell-library that
-        # historically uses FUNCTIONAL also picks up the behavioural path.
-        defines = {"functional": True, "FUNCTIONAL": True}
+        # `functional` (lowercase) gates IO pad behavioural models in
+        # gf180mcu_fd_io.v and must always be set for GLS.
+        # Uppercase `FUNCTIONAL` suppresses `specify` blocks in the PDK cell
+        # models (gf180mcu_as_sc_mcu7t3v3.v uses `ifndef FUNCTIONAL guards).
+        # For timed STA GLS (TIMING=1) the SDF annotator needs those specify
+        # blocks active, so we must NOT define FUNCTIONAL in that mode.
+        # For plain functional GLS the specify blocks add overhead with no
+        # benefit, so we keep FUNCTIONAL defined to suppress them.
+        defines = {"functional": True}
+        if not timing:
+            # Functional GLS only: suppress specify blocks for faster compile.
+            defines["FUNCTIONAL"] = True
         if use_power_pins:
             defines["USE_POWER_PINS"] = True
         print(f"[chip_top_tb] GLS netlist: {gl_netlist}")
