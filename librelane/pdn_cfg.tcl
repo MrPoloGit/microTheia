@@ -182,57 +182,57 @@ if { $::env(PDN_CORE_RING) == 1 } {
     }
 }
 
-# define_pdn_grid \
-#     -macro \
-#     -default \
-#     -name macro \
-#     -starts_with POWER \
-#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+define_pdn_grid \
+    -macro \
+    -default \
+    -name macro \
+    -starts_with POWER \
+    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
 
-# add_pdn_connect \
-#     -grid macro \
-#     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect \
+    -grid macro \
+    -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
 
-# # SRAM macros
+# SRAM macros
+define_pdn_grid \
+    -macro \
+    -instances "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[1].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[2].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[3].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[4].sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[1].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[1].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[1].genblk1.sel.u_sram"
+    -name sram_macros_NS \
+    -starts_with POWER \
+    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
 
-# define_pdn_grid \
-#     -macro \
-#     -instances i_chip_core.sram_0 \
-#     -name sram_macros_NS \
-#     -starts_with POWER \
-#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+add_pdn_connect \
+    -grid sram_macros_NS \
+    -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
 
-# add_pdn_connect \
-#     -grid sram_macros_NS \
-#     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect \
+    -grid sram_macros_NS \
+    -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
 
-# add_pdn_connect \
-#     -grid sram_macros_NS \
-#     -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
+# Add stripes on W/E edges of SRAM
+add_pdn_stripe \
+    -grid sram_macros_NS \
+    -layer Metal4 \
+    -width 2.36 \
+    -offset 1.18 \
+    -spacing 0.28 \
+    -pitch 426.86 \
+    -starts_with GROUND \
+    -number_of_straps 2
 
-# # Add stripes on W/E edges of SRAM
-# add_pdn_stripe \
-#     -grid sram_macros_NS \
-#     -layer Metal4 \
-#     -width 2.36 \
-#     -offset 1.18 \
-#     -spacing 0.28 \
-#     -pitch 426.86 \
-#     -starts_with GROUND \
-#     -number_of_straps 2
+# Since the above stripes block the top level PDN at Metal4, add some more stripes
+# to improve the PDN's integrity and ensure a better connection for the macro.
+add_pdn_stripe \
+    -grid sram_macros_NS \
+    -layer Metal4 \
+    -width 4.00 \
+    -offset 65.93 \
+    -spacing 0.28 \
+    -pitch 50 \
+    -starts_with GROUND \
+    -number_of_straps 7
 
-# # Since the above stripes block the top level PDN at Metal4, add some more stripes
-# # to improve the PDN's integrity and ensure a better connection for the macro.
-# add_pdn_stripe \
-#     -grid sram_macros_NS \
-#     -layer Metal4 \
-#     -width 4.00 \
-#     -offset 65.93 \
-#     -spacing 0.28 \
-#     -pitch 50 \
-#     -starts_with GROUND \
-#     -number_of_straps 7
-
+# East orientation
 # define_pdn_grid \
 #     -macro \
 #     -instances i_chip_core.sram_1 \
@@ -270,58 +270,3 @@ if { $::env(PDN_CORE_RING) == 1 } {
 #     -pitch 48.48 \
 #     -starts_with GROUND \
 #     -number_of_straps 9
-
-# Weight SRAMs (col0, x=500) — 8 × sram1024x8
-define_pdn_grid \
-    -macro \
-    -instances "i_chip_core.u_soc.u_core.gen_weight_ram" \
-    -name sram_weight \
-    -starts_with POWER \
-    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
-
-add_pdn_connect -grid sram_weight -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
-add_pdn_connect -grid sram_weight -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
-
-# Feature RAM (col1, x=2800) — 4 × sram1024x8
-define_pdn_grid \
-    -macro \
-    -instances "i_chip_core.u_soc.u_core.u_feature_ram" \
-    -name sram_feature \
-    -starts_with POWER \
-    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
-
-add_pdn_connect -grid sram_feature -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
-add_pdn_connect -grid sram_feature -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
-
-# Counter mem (col1 continued) — 4 × sram1024x8
-define_pdn_grid \
-    -macro \
-    -instances "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem" \
-    -name sram_counter \
-    -starts_with POWER \
-    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
-
-add_pdn_connect -grid sram_counter -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
-add_pdn_connect -grid sram_counter -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
-
-# Input FIFO (4 × sram256x8)
-define_pdn_grid \
-    -macro \
-    -instances "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem" \
-    -name sram_fifo \
-    -starts_with POWER \
-    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
-
-add_pdn_connect -grid sram_fifo -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
-add_pdn_connect -grid sram_fifo -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
-
-# Threshold RAM (5 × sram256x8)
-define_pdn_grid \
-    -macro \
-    -instances "i_chip_core.u_soc.u_core.u_thresh_ram" \
-    -name sram_thresh \
-    -starts_with POWER \
-    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
-
-add_pdn_connect -grid sram_thresh -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
-add_pdn_connect -grid sram_thresh -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
