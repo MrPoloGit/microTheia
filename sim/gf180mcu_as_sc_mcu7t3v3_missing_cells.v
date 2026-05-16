@@ -11,10 +11,11 @@
 //     ao211 :  Y = (A & B) | C | D
 //     aoi211: Y = !((A & B) | C | D)
 //     oai211: Y = !((A | B) & C & D)
+//     xor2  : Y = (A & !B) | (B & !A)     // = A ^ B
 //
 // Pin order matches the netlist instantiations (and the convention used by
 // the other ao/aoi/oai cells in gf180mcu_as_sc_mcu7t3v3.v): power pins
-// VPW/VNW/VDD/VSS first, then signal inputs A,B,C,D, output Y.
+// VPW/VNW/VDD/VSS first, then signal inputs A,B[,C,D], output Y.
 
 `timescale 1ns/1ps
 
@@ -116,13 +117,14 @@ module gf180mcu_as_sc_mcu7t3v3__dfxtp_4 (
     always @(posedge CLK) begin
         Q <= D;
     end
+
 `ifndef FUNCTIONAL
 specify
-	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
-	$setup(posedge D, posedge CLK, 0:0:0);
-	$setup(negedge D, posedge CLK, 0:0:0);
-	$hold(posedge CLK, posedge D, 0:0:0);
-	$hold(posedge CLK, negedge D, 0:0:0);
+      (posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
+      $setup(posedge D, posedge CLK, 0:0:0);
+      $setup(negedge D, posedge CLK, 0:0:0);
+      $hold(posedge CLK, posedge D, 0:0:0);
+      $hold(posedge CLK, negedge D, 0:0:0);
 endspecify
 `endif
 
@@ -145,12 +147,13 @@ module gf180mcu_as_sc_mcu7t3v3__xor2_2 (
     output Y
 );
     assign Y = A ^ B;
+
 `ifndef FUNCTIONAL
 specify
-	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
-	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
-	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
-	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+      (posedge A => (Y:A)) = (0:0:0, 0:0:0);
+      (negedge A => (Y:A)) = (0:0:0, 0:0:0);
+      (posedge B => (Y:B)) = (0:0:0, 0:0:0);
+      (negedge B => (Y:B)) = (0:0:0, 0:0:0);
 endspecify
 `endif
 

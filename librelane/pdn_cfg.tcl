@@ -182,26 +182,146 @@ if { $::env(PDN_CORE_RING) == 1 } {
     }
 }
 
+# define_pdn_grid \
+#     -macro \
+#     -default \
+#     -name macro \
+#     -starts_with POWER \
+#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+# add_pdn_connect \
+#     -grid macro \
+#     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+
+# # SRAM macros
+
+# define_pdn_grid \
+#     -macro \
+#     -instances i_chip_core.sram_0 \
+#     -name sram_macros_NS \
+#     -starts_with POWER \
+#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+# add_pdn_connect \
+#     -grid sram_macros_NS \
+#     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+
+# add_pdn_connect \
+#     -grid sram_macros_NS \
+#     -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
+
+# # Add stripes on W/E edges of SRAM
+# add_pdn_stripe \
+#     -grid sram_macros_NS \
+#     -layer Metal4 \
+#     -width 2.36 \
+#     -offset 1.18 \
+#     -spacing 0.28 \
+#     -pitch 426.86 \
+#     -starts_with GROUND \
+#     -number_of_straps 2
+
+# # Since the above stripes block the top level PDN at Metal4, add some more stripes
+# # to improve the PDN's integrity and ensure a better connection for the macro.
+# add_pdn_stripe \
+#     -grid sram_macros_NS \
+#     -layer Metal4 \
+#     -width 4.00 \
+#     -offset 65.93 \
+#     -spacing 0.28 \
+#     -pitch 50 \
+#     -starts_with GROUND \
+#     -number_of_straps 7
+
+# define_pdn_grid \
+#     -macro \
+#     -instances i_chip_core.sram_1 \
+#     -name sram_macros_WE \
+#     -starts_with POWER \
+#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+# add_pdn_connect \
+#     -grid sram_macros_WE \
+#     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+
+# add_pdn_connect \
+#     -grid sram_macros_WE \
+#     -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
+
+# # Add stripes on W/E edges of SRAM
+# add_pdn_stripe \
+#     -grid sram_macros_WE \
+#     -layer Metal4 \
+#     -width 2.36 \
+#     -offset 1.18 \
+#     -spacing 0.28 \
+#     -pitch 479.88 \
+#     -starts_with GROUND \
+#     -number_of_straps 2
+
+# # Since the above stripes block the top level PDN at Metal4, add some more stripes
+# # to improve the PDN's integrity and ensure a better connection for the macro.
+# add_pdn_stripe \
+#     -grid sram_macros_WE \
+#     -layer Metal4 \
+#     -width 4.00 \
+#     -offset 46.48 \
+#     -spacing 0.28 \
+#     -pitch 48.48 \
+#     -starts_with GROUND \
+#     -number_of_straps 9
+
+# Weight SRAMs (col0, x=500) — 8 × sram1024x8
 define_pdn_grid \
     -macro \
-    -default \
-    -name macro \
+    -instances "i_chip_core.u_soc.u_core.gen_weight_ram" \
+    -name sram_weight \
     -starts_with POWER \
     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
 
-add_pdn_connect \
-    -grid macro \
-    -layers "Metal1 $::env(PDN_VERTICAL_LAYER)"
+add_pdn_connect -grid sram_weight -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect -grid sram_weight -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
 
-add_pdn_connect \
-    -grid macro \
-    -layers "Metal1 $::env(PDN_HORIZONTAL_LAYER)"
+# Feature RAM (col1, x=2800) — 4 × sram1024x8
+define_pdn_grid \
+    -macro \
+    -instances "i_chip_core.u_soc.u_core.u_feature_ram" \
+    -name sram_feature \
+    -starts_with POWER \
+    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
 
-add_pdn_connect \
-    -grid macro \
-    -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect -grid sram_feature -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect -grid sram_feature -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
 
-# SRAM macros — all 25 SRAM tiles are covered by the default macro grid above.
-# Instance-specific grids were removed because the old instance paths
-# (i_chip_core.sram_0/1) no longer exist; macros are now deeply nested under
-# i_chip_core.u_soc.u_core.* and handled via the -default macro grid.
+# Counter mem (col1 continued) — 4 × sram1024x8
+define_pdn_grid \
+    -macro \
+    -instances "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem" \
+    -name sram_counter \
+    -starts_with POWER \
+    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+add_pdn_connect -grid sram_counter -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect -grid sram_counter -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
+
+# Input FIFO (4 × sram256x8)
+define_pdn_grid \
+    -macro \
+    -instances "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem" \
+    -name sram_fifo \
+    -starts_with POWER \
+    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+add_pdn_connect -grid sram_fifo -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect -grid sram_fifo -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
+
+# Threshold RAM (5 × sram256x8)
+define_pdn_grid \
+    -macro \
+    -instances "i_chip_core.u_soc.u_core.u_thresh_ram" \
+    -name sram_thresh \
+    -starts_with POWER \
+    -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+add_pdn_connect -grid sram_thresh -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
+add_pdn_connect -grid sram_thresh -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
