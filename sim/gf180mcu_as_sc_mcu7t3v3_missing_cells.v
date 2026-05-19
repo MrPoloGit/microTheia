@@ -160,3 +160,29 @@ endspecify
 endmodule
 
 `endif
+
+module gf180mcu_as_sc_mcu7t3v3__xor2_2 (
+`ifdef USE_POWER_PINS
+    inout VDD,
+    inout VNW,
+    inout VPW,
+    inout VSS,
+`endif
+    input A,
+    input B,
+    output Y
+);
+    assign Y = A ^ B;
+
+`ifndef FUNCTIONAL
+specify
+      (posedge A => (Y:A)) = (0:0:0, 0:0:0);
+      (negedge A => (Y:A)) = (0:0:0, 0:0:0);
+      (posedge B => (Y:B)) = (0:0:0, 0:0:0);
+      (negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+`endif
