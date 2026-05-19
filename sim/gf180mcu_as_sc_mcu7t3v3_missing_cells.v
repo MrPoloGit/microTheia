@@ -11,10 +11,11 @@
 //     ao211 :  Y = (A & B) | C | D
 //     aoi211: Y = !((A & B) | C | D)
 //     oai211: Y = !((A | B) & C & D)
+//     xor2  : Y = (A & !B) | (B & !A)     // = A ^ B
 //
 // Pin order matches the netlist instantiations (and the convention used by
 // the other ao/aoi/oai cells in gf180mcu_as_sc_mcu7t3v3.v): power pins
-// VPW/VNW/VDD/VSS first, then signal inputs A,B,C,D, output Y.
+// VPW/VNW/VDD/VSS first, then signal inputs A,B[,C,D], output Y.
 
 `timescale 1ns/1ps
 
@@ -216,3 +217,15 @@ endspecify
 endmodule
 
 `endif
+
+// module gf180mcu_as_sc_mcu7t3v3__xor2_2 (
+//     input  VPW,
+//     input  VNW,
+//     input  VDD,
+//     input  VSS,
+//     input  A,
+//     input  B,
+//     output Y
+// );
+//     assign Y = A ^ B;
+// endmodule
