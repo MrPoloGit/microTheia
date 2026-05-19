@@ -220,13 +220,27 @@ sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gestu
 STA_RUN ?= RUN_2026-05-15_11-55-49
 STA_CORNER ?= nom_tt_025C_3v30
 STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinsertion/chip_top.pnl.v
-# Feed Icarus the raw OpenROAD-emitted SDF. Earlier flow used a hand-stripped
-# .icarus.sdf which dropped the SDF v3.0 backslash escapes in instance names
-# like `bidir\[0\]\.pad`, making Icarus parse them as vector indices and emit
-# "Cannot find bidir[0]" errors. Icarus 13 handles the escaped form natively.
-STA_SDF ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/54-openroad-stapostpnr/$(STA_CORNER)/chip_top__$(STA_CORNER).sdf
+# Raw OpenROAD-emitted SDF. Not consumed directly by Icarus — see comment on
+# STA_SDF below for why we preprocess it.
+STA_SDF_RAW ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/54-openroad-stapostpnr/$(STA_CORNER)/chip_top__$(STA_CORNER).sdf
+# Icarus-friendly SDF produced from STA_SDF_RAW by scripts/sdf_fix_for_icarus.py.
+# Icarus 13's SDF parser has two specific gaps that make the raw file fatal:
+#   1. (VOLTAGE max::min) / (TEMPERATURE max::min) header triplets have an
+#      empty typ slot. Icarus aborts with "Chosen value not defined".
+#   2. INTERCONNECT entries that reference IO pad / SRAM instances with
+#      escaped names (e.g. `analog\[1\]\.pad.ASIG5V`) crash vvp with a NULL
+#      handle in vpi_scan — Icarus's path splitter doesn't honour SDF v3.0
+#      backslash escapes inside INTERCONNECT scopes.
+# The preprocessor fixes the triplets and strips just the unannotatable
+# INTERCONNECT entries (all of which carry sub-ns or zero delays). Cell-level
+# IOPATHs, TIMINGCHECKs, and conditional delays — the real timing data — are
+# left untouched.
+STA_SDF ?= $(MAKEFILE_DIR)/cocotb/chip_top__$(STA_CORNER).icarus.sdf
 
-sim-gl-sta: ## Run timed STA gate-level simulation with SDF, reset smoke test only
+$(STA_SDF): $(STA_SDF_RAW) $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py
+	python3 $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py $(STA_SDF_RAW) $(STA_SDF)
+
+sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF, reset smoke test only
 	cd cocotb; LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
 	WAVES=0 \
 	FORCE_REBUILD=${FORCE_REBUILD} \
@@ -238,7 +252,7 @@ sim-gl-sta: ## Run timed STA gate-level simulation with SDF, reset smoke test on
 .PHONY: sim-gl-sta
 
 
-sim-gl-sta-parallel: ## Run all 4 gestures in parallel with timed STA GLS using Icarus
+sim-gl-sta-parallel: $(STA_SDF) ## Run all 4 gestures in parallel with timed STA GLS using Icarus
 	@mkdir -p logs
 	@echo "Launching 4 parallel STA GLS classify runs (gestures 0-3, Icarus + SDF) …"
 	@set -e ; for g in 0 1 2 3 ; do \
