@@ -16,6 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set fp [open "/tmp/macro_instances.txt" w]
+foreach inst [[ord::get_db_block] getInsts] {
+    if { [$inst isBlock] } {
+        puts $fp "[$inst getName]"
+    }
+}
+close $fp
+
 source $::env(SCRIPTS_DIR)/openroad/common/io.tcl
 source $::env(SCRIPTS_DIR)/openroad/common/set_global_connections.tcl
 set_global_connections
@@ -194,11 +202,58 @@ if { $::env(PDN_CORE_RING) == 1 } {
 #     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
 
 # # SRAM macros
-
 # define_pdn_grid \
 #     -macro \
-#     -instances i_chip_core.sram_0 \
+#     -instances "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[1].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[2].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[3].sel.u_sram i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[4].sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[1].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[1].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[0].genblk1.sel.u_sram i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[1].genblk1.sel.u_sram" \
 #     -name sram_macros_NS \
+#     -starts_with POWER \
+#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
+
+# # Rename SRAM instances in ODB: replace \[ \] with [ ] so define_pdn_grid can find them
+# set sram_instance_names [list \
+#     {i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank\[0\].gen_byte\[0\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank\[0\].gen_byte\[1\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank\[0\].gen_byte\[2\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank\[0\].gen_byte\[3\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank\[0\].gen_byte\[0\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank\[0\].gen_byte\[1\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank\[0\].gen_byte\[2\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank\[0\].gen_byte\[3\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank\[0\].gen_byte\[4\].sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[0\].u_weight_ram.gen_bank\[0\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[0\].u_weight_ram.gen_bank\[1\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[1\].u_weight_ram.gen_bank\[0\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[1\].u_weight_ram.gen_bank\[1\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[2\].u_weight_ram.gen_bank\[0\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[2\].u_weight_ram.gen_bank\[1\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[3\].u_weight_ram.gen_bank\[0\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.gen_weight_ram\[3\].u_weight_ram.gen_bank\[1\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_feature_ram.gen_bank\[0\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_feature_ram.gen_bank\[0\].gen_byte\[1\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_feature_ram.gen_bank\[1\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_feature_ram.gen_bank\[1\].gen_byte\[1\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank\[0\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank\[0\].gen_byte\[1\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank\[1\].gen_byte\[0\].genblk1.sel.u_sram} \
+#     {i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank\[1\].gen_byte\[1\].genblk1.sel.u_sram} \
+# ]
+
+# foreach name $sram_instance_names {
+#     set inst [[ord::get_db_block] findInst $name]
+#     if { $inst == "NULL" } {
+#         puts "ERROR: Could not find instance $name"
+#     } else {
+#         regsub -all {\\} $name {} new_name
+#         $inst rename $new_name
+#         puts "Renamed: $name -> $new_name"
+#         lappend sram_instances_unescaped $new_name
+#     }
+# }
+
+# define_pdn_grid \
+#     -name sram_macros_NS \
+#     -macro \
+#     -instances $sram_instances_unescaped \
 #     -starts_with POWER \
 #     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
 
@@ -232,44 +287,6 @@ if { $::env(PDN_CORE_RING) == 1 } {
 #     -pitch 50 \
 #     -starts_with GROUND \
 #     -number_of_straps 7
-
-# define_pdn_grid \
-#     -macro \
-#     -instances i_chip_core.sram_1 \
-#     -name sram_macros_WE \
-#     -starts_with POWER \
-#     -halo "$::env(PDN_HORIZONTAL_HALO) $::env(PDN_VERTICAL_HALO)"
-
-# add_pdn_connect \
-#     -grid sram_macros_WE \
-#     -layers "$::env(PDN_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
-
-# add_pdn_connect \
-#     -grid sram_macros_WE \
-#     -layers "$::env(PDN_VERTICAL_LAYER) Metal3"
-
-# # Add stripes on W/E edges of SRAM
-# add_pdn_stripe \
-#     -grid sram_macros_WE \
-#     -layer Metal4 \
-#     -width 2.36 \
-#     -offset 1.18 \
-#     -spacing 0.28 \
-#     -pitch 479.88 \
-#     -starts_with GROUND \
-#     -number_of_straps 2
-
-# # Since the above stripes block the top level PDN at Metal4, add some more stripes
-# # to improve the PDN's integrity and ensure a better connection for the macro.
-# add_pdn_stripe \
-#     -grid sram_macros_WE \
-#     -layer Metal4 \
-#     -width 4.00 \
-#     -offset 46.48 \
-#     -spacing 0.28 \
-#     -pitch 48.48 \
-#     -starts_with GROUND \
-#     -number_of_straps 9
 
 # Weight SRAMs (col0, x=500) — 8 × sram1024x8
 define_pdn_grid \
