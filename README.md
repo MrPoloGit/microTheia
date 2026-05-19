@@ -9,10 +9,9 @@ Make sure Git and Git LFS are installed.
 ```bash
 git clone git@github.com:dolphin-530/microTheia.git
 cd microTheia
-git submodule update --init --recursive
 make clone-pdk
-make clone-avalon-pdk
-make clone-ocd-sram
+make install-3v3-scl
+git submodule update --init third_party/verilog_spi
 git lfs pull
 ```
 
@@ -155,19 +154,6 @@ Once synthesized and having a working bitstream to flash and test, go into the [
 | pyserial | 3.5 | Dockerfile, ice40/requirements.txt |
 
 Run `pip install -r scripts/requirements.txt` for RTL simulation, or `pip install -r ice40/requirements.txt` for FPGA tools.
-
-## Pin Assignment (INCOMPLETE)
-
-| Signal | Pins | Direction | Type | Notes |
-|--------|------|-----------|------|-------|
-| clk | 1 | in | Clock | System clock |
-| rst | 1 | in | Reset | Active high |
-| event_data[7:0] | 8 | in | Data | EVT2.0 events (32-bit over 4 cycles) |
-| event_valid | 1 | in | Handshake | Data valid |
-| event_ready | 1 | out | Handshake | Ready to accept |
-| spi_clk, spi_mosi, spi_miso, spi_cs | 4 | in/out | SPI | Configuration interface |
-| uart_tx, uart_rx | 2 | in/out | UART | Debug/output |
-| debug[N:0] | M | out | Debug | Tied to VSS when not used |
 
 ## Third Party
 - https://github.com/google/globalfoundries-pdk-ip-gf180mcu_fd_ip_sram

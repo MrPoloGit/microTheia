@@ -238,6 +238,8 @@ module voxel_bin_core #(
         .load_state_dbg_o  (load_state_dbg_o) // 6 bits
     );
 
+    wire [11:0] fsm_debug_bus = { main_state_dbg_o, load_state_dbg_o, boot_fail_o, boot_done_o};
+
     // ------------------------------------------------------------------
     // Input FIFO
     // ------------------------------------------------------------------
@@ -465,9 +467,7 @@ module voxel_bin_core #(
         .score_D       (score_D),
         .fifo_in       (evt_word),
         .fifo_out      (fifo_out_data),
-        /* verilator lint_off PINCONNECTEMPTY */
-        .fsm_debug_bus (),
-        /* verilator lint_off PINCONNECTEMPTY */
+        .fsm_debug_bus (fsm_debug_bus),
         .debug_select  (debug_page_sel)
     );
 
