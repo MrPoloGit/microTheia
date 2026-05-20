@@ -468,7 +468,9 @@ module voxel_bin_core #(
         .fifo_in       (evt_word),
         .fifo_out      (fifo_out_data),
         .fsm_debug_bus (fsm_debug_bus),
-        .debug_select  (debug_page_sel)
+        .debug_select  (debug_page_sel),
+        .clk           (clk),
+        .rst           (rst)
     );
 
     assign debug_mux = debug_bus;
