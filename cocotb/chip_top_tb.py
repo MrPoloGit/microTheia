@@ -906,18 +906,29 @@ class _GestureResult:
         self.gestures   = []           # ordered list of (gesture, confidence)
 
     def dominant(self):
-        """(gesture, confidence) of the most-frequent class.  None if empty."""
+        """(gesture, confidence) of the most-frequent class. None if empty.
+
+        Ties are broken by recency: among classes tied for the highest pulse
+        count, the most recently observed wins. The chip uses a sliding-window
+        classifier, so later windows see more of the gesture and produce more
+        reliable classifications — the class docstring notes that the first
+        window of wave_left can look like wave_up before the full motion is
+        observed. Python's default dict-iteration tiebreak (first-inserted
+        wins) would penalize the correct late-arriving class on a tie.
+        """
         if not self.gestures:
             return None, None
         counts = {}
         for g, _ in self.gestures:
             counts[g] = counts.get(g, 0) + 1
-        winner = max(counts, key=counts.get)
-        # Use the most-recent confidence reported for the winning class.
+        max_count = max(counts.values())
+        # Walk pulses in reverse; the first tied class encountered is the
+        # most recently observed — that's our winner. The confidence
+        # accompanying that pulse is also the most recent for that class.
         for g, c in reversed(self.gestures):
-            if g == winner:
-                return winner, c
-        return winner, 0
+            if counts[g] == max_count:
+                return g, c
+        return None, None  # unreachable: max_count came from this list
 
 
 async def _gesture_monitor(dut, result):
@@ -990,7 +1001,14 @@ async def _sample_miso_during_drain(dut, pins, result, *, num_samples, gap_cycle
     confidence) are merged. spi_wrapper holds the last value until the next
     gesture_valid pulse, so an unchanged read means no new pulse fired.
     """
-    prev = None
+    # spi_wrapper's gesture-readback register resets to (gesture=0, confidence=0).
+    # Until the first real gesture_valid pulse fires, drain samples return that
+    # baseline. Seed prev with it so the dedup loop does not record the
+    # uninitialized state as a spurious (Down,0) pulse — a real classification
+    # always carries confidence=1, so it will still differ from prev and be
+    # recorded. Without this, every test gains an inserted-first "Down" vote
+    # that wins tied histograms via insertion-order tiebreak in dominant().
+    prev = (0, 0)
     for i in range(num_samples):
         await ClockCycles(dut.clk_PAD, gap_cycles)
         miso = await _spi_xfer(dut, pins, _debug_page(0),
