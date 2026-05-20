@@ -251,13 +251,16 @@ sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF, reset sm
 	python3 chip_top_tb.py
 .PHONY: sim-gl-sta
 
+GESTURES ?= 0 1 2 3
 
-sim-gl-sta-parallel: $(STA_SDF) ## Run all 4 gestures in parallel with timed STA GLS using Icarus
+sim-gl-sta-parallel: $(STA_SDF) ## Run gestures in parallel with timed STA GLS using Icarus + SDF
 	@mkdir -p logs
-	@echo "Launching 4 parallel STA GLS classify runs (gestures 0-3, Icarus + SDF) …"
-	@set -e ; for g in 0 1 2 3 ; do \
+	@echo "Launching STA GLS classify runs for gestures: $(GESTURES)"
+	@set -e ; for g in $(GESTURES) ; do \
 		LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
-		  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
+		  WAVES=0 \
+		  FORCE_REBUILD=$(FORCE_REBUILD) \
+		  PDK_ROOT=$(PDK_ROOT) PDK=$(PDK) SLOT=$(SLOT) \
 		  GL_NETLIST=$(STA_NETLIST) \
 		  SDF_FILE=$(STA_SDF) \
 		  GESTURE_INDICES=$$g \
@@ -271,9 +274,10 @@ sim-gl-sta-parallel: $(STA_SDF) ## Run all 4 gestures in parallel with timed STA
 	wait
 	@echo
 	@echo "All STA GLS gesture runs finished. Summary:"
-	@for g in 0 1 2 3 ; do \
-		echo "  Gesture $$g: $$(grep -oE 'PASS=[0-9]+ FAIL=[0-9]+ SKIP=[0-9]+' logs/sta_gls_gesture_$$g.log | tail -1)" ; \
+	@for g in $(GESTURES) ; do \
+		echo "  Gesture $$g: $$(grep -oE 'TESTS=[0-9]+ PASS=[0-9]+ FAIL=[0-9]+ SKIP=[0-9]+' logs/sta_gls_gesture_$$g.log | tail -1 || echo 'no summary found')" ; \
 	done
+
 .PHONY: sim-gl-sta-parallel
 
 sim-view: ## View simulation waveforms in GTKWave
