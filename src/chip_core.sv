@@ -99,7 +99,7 @@ module chip_core #(
         .spi_ready(spi_ready) //signal that the spi frontend module has succesfully initialized and is ready to begin operation. NOTE: reset must go high to initialize spi module
     );
     //assigning spi ready and debug bus to pins according to pinout chart, currently do not support alternating these to a different pinout
-    assign bidir_out[39] = spi_ready;
+    assign bidir_out[1] = spi_ready;
     assign bidir_out [37:6] = debug_bus;
 
     // sync ALT_INPUT_MODE pin, then detect rising edge
@@ -135,8 +135,8 @@ module chip_core #(
     assign CS_wire   = alt_select ? input_in[4] : input_in[7];
 
     //muxing MISO to output pins, and disabling output for inactive ports
-    assign bidir_out[0] =  !alt_select ? MISO_wire : 1'b0;
-    assign bidir_out[1] = alt_select ? MISO_wire : 1'b0;
+    assign bidir_out[38] =  !alt_select ? MISO_wire : 1'b0;
+    assign bidir_out[39] = alt_select ? MISO_wire : 1'b0;
     assign bidir_oe[0] = !alt_select;  // active default MISO
     assign bidir_oe[1] = alt_select;  // active alternative MISO
 
@@ -148,7 +148,7 @@ module chip_core #(
         else
             counter <= counter + 1'b1;
     end
-    assign bidir_out[38] = counter[24]; //bidirect pin 38 is heartbeat signal.
+    assign bidir_out[0] = counter[24]; //bidirect pin 38 is heartbeat signal.
 
 endmodule
 
