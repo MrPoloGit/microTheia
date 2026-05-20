@@ -99,7 +99,7 @@ PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
 GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
 
 # Increase for more logic on your die
-PL_TARGET_DENSITY_PCT: 35
+PL_TARGET_DENSITY_PCT: 40
 GRT_ALLOW_CONGESTION: true
 
 # Fix antenna violations after DRT
@@ -246,16 +246,16 @@ MACROS:
             # x pitch is 400µm so is aprox 99µm horizontal space between 
             # y pitch is 300µm so about 170µm vertical space between rows
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram":
-                location: [800, 3160]
+                location: [800, 3060]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[1].sel.u_sram":
-                location: [1200, 3160]
+                location: [1200, 3060]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[2].sel.u_sram":
-                location: [800, 2860]
+                location: [800, 2760]
                 orientation: S
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram":
-                location: [1200, 2860]
+                location: [1200, 2760]
                 orientation: S
             # thresh_ram: 1 bank × 5 byte-lanes
             # W/E that im using rotates the 256x8 macro so the footprint is roughly 130µm × 301µm
@@ -340,32 +340,32 @@ MACROS:
             # x pitch 400µm so about 99µm horizontal spacing.
             # y pitch 545µm (barely clears, works)
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [2400, 3405]
+                location: [2400, 3305]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
-                location: [2800, 3405]
+                location: [2800, 3305]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [2400, 2860]
+                location: [2400, 2760]
                 orientation: S
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
-                location: [2800, 2860]
+                location: [2800, 2760]
                 orientation: S
             # counter_mem 4 tiles arranged as a 2×2 block next to feature_ram
             # y=3400 for N and y=2860 for S.
             # x locations are 1600 and 2000, lines up with the feature_ram block
             # 400µm horizontal pitch and 545µm vertical pitch.
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
-                location: [1600, 3405]
+                location: [1600, 3305]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[1].genblk1.sel.u_sram":
-                location: [2000, 3405]
+                location: [2000, 3305]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
-                location: [1600, 2860]
+                location: [1600, 2760]
                 orientation: S
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
-                location: [2000, 2860]
+                location: [2000, 2760]
                 orientation: S
 
 # # This is an alternative method compared to
