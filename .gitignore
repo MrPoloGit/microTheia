@@ -51,4 +51,4 @@ project/
 src/rtl/
 target/
 
-# cocotb/*.sdf
+cocotb/*.sdf
