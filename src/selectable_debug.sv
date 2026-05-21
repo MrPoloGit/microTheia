@@ -2,30 +2,33 @@
 // Copyright (c) 2026 Group G Contributors
 `timescale 1ns/1ps
 
-
-//bus widths are NOT parameterized
-//all connections are for SPECIFIC pins
+// bus widths are NOT parameterized
+// all connections are for SPECIFIC pins
 module selectable_debug (
-    output [31:0] debug_bus,
-    input [10:0]  class_dbg,
-    input [14:0]  mac_dbg,
-    input [30:0]  vox_bin_dbg,
-    input [11:0]  decoder_dbg,
-    input [31:0]  decoder_output,
-    input [3:0]   in_fifo_dbg,
-    input [15:0]  vox_core_debug,
-    input [31:0]  score_A,
-    input [31:0]  score_B,
-    input [31:0]  score_C,
-    input [31:0]  score_D,
-    input [31:0]  fifo_in,
-    input [31:0]  fifo_out,
-    input [11:0]  fsm_debug_bus,
-    input [3:0]   debug_select
+    input  logic        clk,
+    input  logic        rst,
+
+    output logic [31:0] debug_bus,
+
+    input  logic [10:0] class_dbg,
+    input  logic [14:0] mac_dbg,
+    input  logic [30:0] vox_bin_dbg,
+    input  logic [11:0] decoder_dbg,
+    input  logic [31:0] decoder_output,
+    input  logic [3:0]  in_fifo_dbg,
+    input  logic [15:0] vox_core_debug,
+    input  logic [31:0] score_A,
+    input  logic [31:0] score_B,
+    input  logic [31:0] score_C,
+    input  logic [31:0] score_D,
+    input  logic [31:0] fifo_in,
+    input  logic [31:0] fifo_out,
+    input  logic [11:0] fsm_debug_bus,
+    input  logic [3:0]  debug_select
 );
 
-//select debug page to connect to 32 bit debug interface
-//receives debug select signal over SPI
+// select debug page to connect to 32 bit debug interface
+// receives debug select signal over SPI
 
 /*
 PAGE 0 (debug_select = 4'b0000): voxel_gesture_classifier and voxel_mac_engine debug
@@ -137,7 +140,7 @@ bit index       description
 PAGE 3 (debug_select = 4'b0011): FSM debug
 bit index       description
 [11:0]          fsm_debug_bus  ->    main_state_dbg_o [11:6] load_state_dbg_o [5:2] boot_fail_o [1] boot_done_o [0]
-[31:12]          reserved
+[31:12]         reserved
 
 PAGE 4 (debug_select = 4'b0100): evt2_decoder event output
 bit index       description
@@ -162,60 +165,82 @@ PAGE 10 (debug_select = 4'b1010): class score_D
 [31:0] = [31:0] score_D
 */
 
-localparam PAGE_0 = 4'b0000;
-localparam PAGE_1 = 4'b0001;
-localparam PAGE_2 = 4'b0010;
-localparam PAGE_3 = 4'b0011;
-localparam PAGE_4 = 4'b0100;
-localparam PAGE_5 = 4'b0101;
-localparam PAGE_6 = 4'b0110;
-localparam PAGE_7 = 4'b0111;
-localparam PAGE_8 = 4'b1000;
-localparam PAGE_9 = 4'b1001;
+localparam PAGE_0  = 4'b0000;
+localparam PAGE_1  = 4'b0001;
+localparam PAGE_2  = 4'b0010;
+localparam PAGE_3  = 4'b0011;
+localparam PAGE_4  = 4'b0100;
+localparam PAGE_5  = 4'b0101;
+localparam PAGE_6  = 4'b0110;
+localparam PAGE_7  = 4'b0111;
+localparam PAGE_8  = 4'b1000;
+localparam PAGE_9  = 4'b1001;
 localparam PAGE_10 = 4'b1010;
 
 logic [31:0] selected_debug;
+
+// Combinational debug page mux.
+// This chooses which internal debug page we want to observe.
 always_comb begin
     // removed unique
     case (debug_select)
         PAGE_0: begin
-            selected_debug = {6'b0, mac_dbg , class_dbg};
+            selected_debug = {6'b0, mac_dbg, class_dbg};
         end
+
         PAGE_1: begin
             selected_debug = {1'b0, vox_bin_dbg};
         end
+
         PAGE_2: begin
             selected_debug = {vox_core_debug, in_fifo_dbg, decoder_dbg};
         end
+
         PAGE_3: begin
             selected_debug = {20'b0, fsm_debug_bus};
         end
 
         PAGE_4: begin
-            selected_debug = {decoder_output};
+            selected_debug = decoder_output;
         end
+
         PAGE_5: begin
             selected_debug = fifo_in;
         end
+
         PAGE_6: begin
             selected_debug = fifo_out;
         end
+
         PAGE_7: begin
             selected_debug = score_A;
         end
+
         PAGE_8: begin
             selected_debug = score_B;
         end
+
         PAGE_9: begin
             selected_debug = score_C;
         end
+
         PAGE_10: begin
             selected_debug = score_D;
         end
-        default: selected_debug = {6'b0, mac_dbg , class_dbg};
+
+        default: begin
+            selected_debug = {6'b0, mac_dbg, class_dbg};
+        end
     endcase
 end
 
-assign debug_bus = selected_debug;
+//adding flops to break long combinational paths
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        debug_bus <= 32'b0;
+    end else begin
+        debug_bus <= selected_debug;
+    end
+end
 
 endmodule

@@ -1,4 +1,5 @@
 # μTheia
+μTheia is a GF180MCU event-camera motion-pattern-classification ASIC. It streams EVT2 event data over SPI, decodes timestamped events, spatially compresses 320×320 coordinates into a 16×16 grid and compresses temporally into 8 programmable duration bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and emits a 4-class pattern detection result.
 
 Project uses wafer.space MPW and runs using the gf180mcu PDK.
 

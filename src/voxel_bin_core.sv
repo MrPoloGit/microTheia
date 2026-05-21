@@ -104,7 +104,7 @@ module voxel_bin_core #(
 
     logic                    feature_rd_valid;
     logic [FEATURE_BITS-1:0] feature_rd_addr;
-    logic [COUNTER_BITS-1:0] feature_rd_data;
+    logic [COUNTER_BITS-1:0] feature_rd_data, feature_rd_data_s; // _s flop to break long paths across chip
 
     logic [FEATURE_BITS-1:0] weight_rd_addr;
     logic                    weight_rd_valid;
@@ -115,7 +115,7 @@ module voxel_bin_core #(
     logic                               mac_busy;
     logic                               mac_rd_en;
     logic [FEATURE_BITS-1:0]            mac_rd_addr;
-    logic [NUM_CLASSES*WEIGHT_BITS-1:0] mac_weight_flat;
+    logic [NUM_CLASSES*WEIGHT_BITS-1:0] mac_weight_flat, mac_weight_flat_s; // _s flop same as above
     logic [NUM_CLASSES*SCORE_BITS-1:0]  mac_scores_flat;
     logic                               mac_scores_valid;
 
@@ -405,6 +405,20 @@ module voxel_bin_core #(
     // ------------------------------------------------------------------
     // MAC engine
     // ------------------------------------------------------------------
+
+    //adding experimental flops
+    // WORKS! went from negative to several ps of positive setup slack
+    // verified with cocotb extra latency cycle does not break system
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            mac_weight_flat_s <= '0;
+            feature_rd_data_s <= '0;
+        end
+        else begin
+            mac_weight_flat_s <= mac_weight_flat;
+            feature_rd_data_s <= feature_rd_data;
+        end    
+    end    
     voxel_mac_engine #(
         .FEATURE_COUNT(FEATURE_COUNT),
         .COUNTER_BITS (COUNTER_BITS),
@@ -418,8 +432,8 @@ module voxel_bin_core #(
         .busy             (mac_busy),
         .rd_en            (mac_rd_en),
         .rd_addr          (mac_rd_addr),
-        .feature_data     (feature_rd_data),
-        .weight_data_flat (mac_weight_flat),
+        .feature_data     (feature_rd_data_s), 
+        .weight_data_flat (mac_weight_flat_s), 
         .scores_flat      (mac_scores_flat),
         .scores_valid     (mac_scores_valid),
         .mac_dbg          (mac_dbg),
@@ -468,7 +482,9 @@ module voxel_bin_core #(
         .fifo_in       (evt_word),
         .fifo_out      (fifo_out_data),
         .fsm_debug_bus (fsm_debug_bus),
-        .debug_select  (debug_page_sel)
+        .debug_select  (debug_page_sel),
+        .clk           (clk),
+        .rst           (rst)
     );
 
     assign debug_mux = debug_bus;
