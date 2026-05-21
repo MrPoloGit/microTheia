@@ -217,7 +217,7 @@ sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gestu
 	done
 .PHONY: sim-gl-parallel
 
-STA_RUN ?= RUN_2026-05-15_11-55-49
+STA_RUN ?= RUN_2026-05-11_15-06-35
 STA_CORNER ?= nom_tt_025C_3v30
 STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinsertion/chip_top.pnl.v
 # Raw OpenROAD-emitted SDF. Not consumed directly by Icarus — see comment on
@@ -251,16 +251,14 @@ sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF, reset sm
 	python3 chip_top_tb.py
 .PHONY: sim-gl-sta
 
-GESTURES ?= 0 1 2 3
-
-sim-gl-sta-parallel: $(STA_SDF) ## Run gestures in parallel with timed STA GLS using Icarus + SDF
+sim-gl-sta-parallel: $(STA_SDF) ## Run all 4 gestures in parallel with timed STA GLS using Icarus
 	@mkdir -p logs
-	@echo "Launching STA GLS classify runs for gestures: $(GESTURES)"
-	@set -e ; for g in $(GESTURES) ; do \
+	@echo "Launching 4 parallel STA GLS classify runs (gestures 0-3, Icarus + SDF) …"
+	@set -e ; for g in 0 1 2 3 ; do \
 		LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
 		  WAVES=0 \
-		  FORCE_REBUILD=$(FORCE_REBUILD) \
-		  PDK_ROOT=$(PDK_ROOT) PDK=$(PDK) SLOT=$(SLOT) \
+		  FORCE_REBUILD=$${FORCE_REBUILD:-0} \
+		  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
 		  GL_NETLIST=$(STA_NETLIST) \
 		  SDF_FILE=$(STA_SDF) \
 		  GESTURE_INDICES=$$g \
@@ -274,8 +272,8 @@ sim-gl-sta-parallel: $(STA_SDF) ## Run gestures in parallel with timed STA GLS u
 	wait
 	@echo
 	@echo "All STA GLS gesture runs finished. Summary:"
-	@for g in $(GESTURES) ; do \
-		echo "  Gesture $$g: $$(grep -oE 'TESTS=[0-9]+ PASS=[0-9]+ FAIL=[0-9]+ SKIP=[0-9]+' logs/sta_gls_gesture_$$g.log | tail -1 || echo 'no summary found')" ; \
+	@for g in 0 1 2 3 ; do \
+		echo "  Gesture $$g: $$(grep -oE 'PASS=[0-9]+ FAIL=[0-9]+ SKIP=[0-9]+' logs/sta_gls_gesture_$$g.log | tail -1)" ; \
 	done
 
 .PHONY: sim-gl-sta-parallel

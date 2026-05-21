@@ -906,13 +906,22 @@ class _GestureResult:
         self.gestures   = []           # ordered list of (gesture, confidence)
 
     def dominant(self):
-        """(gesture, confidence) of the most-frequent class.  None if empty."""
+        """(gesture, confidence) of the most-frequent class.  None if empty.
+
+        Tie-breaking: when two classes have equal pulse counts the one that
+        fired LAST wins.  This matches physical intuition — the chip's most
+        recent confident classification is more likely to be the true answer
+        than an early spurious classification from the first incomplete window.
+        """
         if not self.gestures:
             return None, None
-        counts = {}
-        for g, _ in self.gestures:
-            counts[g] = counts.get(g, 0) + 1
-        winner = max(counts, key=counts.get)
+        counts   = {}
+        last_idx = {}
+        for i, (g, _) in enumerate(self.gestures):
+            counts[g]   = counts.get(g, 0) + 1
+            last_idx[g] = i
+        # Primary key: count (higher = better); secondary: last-seen index (higher = more recent)
+        winner = max(counts, key=lambda g: (counts[g], last_idx[g]))
         # Use the most-recent confidence reported for the winning class.
         for g, c in reversed(self.gestures):
             if g == winner:
@@ -989,8 +998,15 @@ async def _sample_miso_during_drain(dut, pins, result, *, num_samples, gap_cycle
     De-duplication: consecutive samples that read the same (gesture,
     confidence) are merged. spi_wrapper holds the last value until the next
     gesture_valid pulse, so an unchanged read means no new pulse fired.
+
+    The SPI readback register resets to 0x00000000, which decodes as
+    gesture=0 (Down), confidence=0.  We must not count this initial power-on
+    state as a real gesture_valid pulse, because it would inject a spurious
+    "Down" vote into every test that runs before the first real pulse fires.
+    Initialising prev=(0, 0) causes the first stale reading to be treated as
+    already-seen and silently skipped.
     """
-    prev = None
+    prev = (0, 0)   # skip the initial reset/power-on latch state
     for i in range(num_samples):
         await ClockCycles(dut.clk_PAD, gap_cycles)
         miso = await _spi_xfer(dut, pins, _debug_page(0),
