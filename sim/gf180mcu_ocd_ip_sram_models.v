@@ -65,6 +65,16 @@ module gf180mcu_ocd_ip_sram__sram256x8m8wm1 (
         end
     end
     assign Q = q_r;
+`ifndef FUNCTIONAL
+    // Icarus 13 doesn't support bit-selects in path declarations
+    // ("Bit selects are not currently supported in path declarations"), so
+    // use parallel-connect `*>` which expands a 1-bit source against an
+    // N-bit destination into N per-bit paths. This matches the per-bit
+    // `(IOPATH CLK Q[n])` entries the OpenROAD STA SDF emits.
+    specify
+        (CLK *> Q) = (0:0:0, 0:0:0);
+    endspecify
+`endif
 endmodule
 
 module gf180mcu_ocd_ip_sram__sram512x8m8wm1 (
@@ -109,6 +119,16 @@ module gf180mcu_ocd_ip_sram__sram512x8m8wm1 (
         end
     end
     assign Q = q_r;
+`ifndef FUNCTIONAL
+    // Icarus 13 doesn't support bit-selects in path declarations
+    // ("Bit selects are not currently supported in path declarations"), so
+    // use parallel-connect `*>` which expands a 1-bit source against an
+    // N-bit destination into N per-bit paths. This matches the per-bit
+    // `(IOPATH CLK Q[n])` entries the OpenROAD STA SDF emits.
+    specify
+        (CLK *> Q) = (0:0:0, 0:0:0);
+    endspecify
+`endif
 endmodule
 
 module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (
@@ -153,6 +173,16 @@ module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (
         end
     end
     assign Q = q_r;
+`ifndef FUNCTIONAL
+    // Icarus 13 doesn't support bit-selects in path declarations
+    // ("Bit selects are not currently supported in path declarations"), so
+    // use parallel-connect `*>` which expands a 1-bit source against an
+    // N-bit destination into N per-bit paths. This matches the per-bit
+    // `(IOPATH CLK Q[n])` entries the OpenROAD STA SDF emits.
+    specify
+        (CLK *> Q) = (0:0:0, 0:0:0);
+    endspecify
+`endif
 endmodule
 
 `endif

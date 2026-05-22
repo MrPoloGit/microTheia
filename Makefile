@@ -217,6 +217,67 @@ sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gestu
 	done
 .PHONY: sim-gl-parallel
 
+STA_RUN ?= RUN_2026-05-11_15-06-35
+STA_CORNER ?= nom_tt_025C_3v30
+STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinsertion/chip_top.pnl.v
+# Raw OpenROAD-emitted SDF. Not consumed directly by Icarus — see comment on
+# STA_SDF below for why we preprocess it.
+STA_SDF_RAW ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/54-openroad-stapostpnr/$(STA_CORNER)/chip_top__$(STA_CORNER).sdf
+# Icarus-friendly SDF produced from STA_SDF_RAW by scripts/sdf_fix_for_icarus.py.
+# Icarus 13's SDF parser has two specific gaps that make the raw file fatal:
+#   1. (VOLTAGE max::min) / (TEMPERATURE max::min) header triplets have an
+#      empty typ slot. Icarus aborts with "Chosen value not defined".
+#   2. INTERCONNECT entries that reference IO pad / SRAM instances with
+#      escaped names (e.g. `analog\[1\]\.pad.ASIG5V`) crash vvp with a NULL
+#      handle in vpi_scan — Icarus's path splitter doesn't honour SDF v3.0
+#      backslash escapes inside INTERCONNECT scopes.
+# The preprocessor fixes the triplets and strips just the unannotatable
+# INTERCONNECT entries (all of which carry sub-ns or zero delays). Cell-level
+# IOPATHs, TIMINGCHECKs, and conditional delays — the real timing data — are
+# left untouched.
+STA_SDF ?= $(MAKEFILE_DIR)/cocotb/chip_top__$(STA_CORNER).icarus.sdf
+
+$(STA_SDF): $(STA_SDF_RAW) $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py
+	python3 $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py $(STA_SDF_RAW) $(STA_SDF)
+
+sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF, reset smoke test only
+	cd cocotb; LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
+	WAVES=0 \
+	FORCE_REBUILD=${FORCE_REBUILD} \
+	COCOTB_TEST_FILTER=test_reset_and_spi_ready \
+	GL_NETLIST=$(STA_NETLIST) \
+	SDF_FILE=$(STA_SDF) \
+	PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
+	python3 chip_top_tb.py
+.PHONY: sim-gl-sta
+
+sim-gl-sta-parallel: $(STA_SDF) ## Run all 4 gestures in parallel with timed STA GLS using Icarus
+	@mkdir -p logs
+	@echo "Launching 4 parallel STA GLS classify runs (gestures 0-3, Icarus + SDF) …"
+	@set -e ; for g in 0 1 2 3 ; do \
+		LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
+		  WAVES=0 \
+		  FORCE_REBUILD=$${FORCE_REBUILD:-0} \
+		  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
+		  GL_NETLIST=$(STA_NETLIST) \
+		  SDF_FILE=$(STA_SDF) \
+		  GESTURE_INDICES=$$g \
+		  COCOTB_TEST_FILTER=test_classify_all_gestures \
+		  SIM_BUILD=$(MAKEFILE_DIR)/cocotb/sim_build_sta_gl_g$$g \
+		  RESULTS_XML=$(MAKEFILE_DIR)/logs/results_sta_gl_g$$g.xml \
+		  python3 $(MAKEFILE_DIR)/cocotb/chip_top_tb.py \
+		  > $(MAKEFILE_DIR)/logs/sta_gls_gesture_$$g.log 2>&1 & \
+		echo "  PID $$! → gesture $$g, log: logs/sta_gls_gesture_$$g.log" ; \
+	done ; \
+	wait
+	@echo
+	@echo "All STA GLS gesture runs finished. Summary:"
+	@for g in 0 1 2 3 ; do \
+		echo "  Gesture $$g: $$(grep -oE 'PASS=[0-9]+ FAIL=[0-9]+ SKIP=[0-9]+' logs/sta_gls_gesture_$$g.log | tail -1)" ; \
+	done
+
+.PHONY: sim-gl-sta-parallel
+
 sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
 .PHONY: sim-view

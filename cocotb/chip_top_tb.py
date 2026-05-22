@@ -45,7 +45,9 @@ pdk      = os.getenv("PDK",  "gf180mcuD")
 # STD_CELL_LIBRARY = gf180mcu_as_sc_mcu7t3v3). The previous default
 # (gf180mcu_fd_sc_mcu7t5v0) does NOT match the netlist cells.
 scl      = os.getenv("SCL",  "gf180mcu_as_sc_mcu7t3v3")
-gl       = os.getenv("GL",   False)
+gl       = os.getenv("GL", "").lower() not in ("", "0", "false", "no")
+timing   = os.getenv("TIMING", "").lower() not in ("", "0", "false", "no")
+sdf_file = os.getenv("SDF_FILE")
 slot     = os.getenv("SLOT", "1x1")
 
 # Resolve the GLS netlist:
@@ -904,19 +906,28 @@ class _GestureResult:
         self.gestures   = []           # ordered list of (gesture, confidence)
 
     def dominant(self):
-        """(gesture, confidence) of the most-frequent class.  None if empty."""
+        """(gesture, confidence) of the most-frequent class. None if empty.
+
+        Ties are broken by recency: among classes tied for the highest pulse
+        count, the most recently observed wins. The chip uses a sliding-window
+        classifier, so later windows are more likely to represent the completed
+        gesture than an early/incomplete window.
+        """
         if not self.gestures:
             return None, None
+
         counts = {}
         for g, _ in self.gestures:
             counts[g] = counts.get(g, 0) + 1
-        winner = max(counts, key=counts.get)
-        # Use the most-recent confidence reported for the winning class.
-        for g, c in reversed(self.gestures):
-            if g == winner:
-                return winner, c
-        return winner, 0
 
+        max_count = max(counts.values())
+
+        # Walk backward so ties choose the most recent class.
+        for g, c in reversed(self.gestures):
+            if counts[g] == max_count:
+                return g, c
+
+        return None, None
 
 async def _gesture_monitor(dut, result):
     """
@@ -988,7 +999,13 @@ async def _sample_miso_during_drain(dut, pins, result, *, num_samples, gap_cycle
     confidence) are merged. spi_wrapper holds the last value until the next
     gesture_valid pulse, so an unchanged read means no new pulse fired.
     """
-    prev = None
+    # spi_wrapper's gesture-readback register resets to (gesture=0, confidence=0).
+    # Until the first real gesture_valid pulse fires, drain samples return that
+    # baseline. Seed prev with it so the dedup loop does not record the
+    # uninitialized state as a spurious (Down,0) pulse. A real classification
+    # should differ from this once confidence becomes valid.
+    prev = (0, 0)
+
     for i in range(num_samples):
         await ClockCycles(dut.clk_PAD, gap_cycles)
         miso = await _spi_xfer(dut, pins, _debug_page(0),
@@ -1039,8 +1056,22 @@ async def _stream_recording(dut, pins, bin_path):
     dut._log.info(f"Streaming {Path(bin_path).name}: {total} words "
                   f"(single CS-low burst)")
 
-    result       = _GestureResult()
-    monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
+    result = _GestureResult()
+
+    # Regular RTL / non-STA GLS can use the internal gesture_valid monitor.
+    # STA GLS uses chip_top_sdf_wrapper, so internal gate-level signal paths
+    # are harder to resolve. For STA GLS, use the SPI-visible debug readback
+    # path instead.
+    use_pin_level_monitor = os.getenv("TIMING", "").lower() not in ("", "0", "false", "no")
+
+    if use_pin_level_monitor:
+        monitor_task = None
+        dut._log.info(
+            "STA GLS mode: using pin-level SPI debug-page sampling instead "
+            "of internal gesture_valid monitor."
+        )
+    else:
+        monitor_task = cocotb.start_soon(_gesture_monitor(dut, result))
 
     # Single SPI burst with CS held low for the entire stream — matches how
     # a real GenX320 sensor delivers events: continuous, no CS toggling.
@@ -1052,12 +1083,17 @@ async def _stream_recording(dut, pins, bin_path):
     #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
     #   • MAC engine settling (~2049)
     #   • classifier 4-stage pipeline
-    # so the chip has emitted every gesture_valid pulse it will ever emit
-    # for this recording before we cancel the monitor.
     dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
-    await ClockCycles(dut.clk_PAD, 50_000)
 
-    monitor_task.cancel()
+    if use_pin_level_monitor:
+        await _sample_miso_during_drain(
+            dut, pins, result,
+            num_samples=50,
+            gap_cycles=1000,
+        )
+    else:
+        await ClockCycles(dut.clk_PAD, 50_000)
+        monitor_task.cancel()
 
     if not result.gestures:
         raise AssertionError(
@@ -1443,23 +1479,35 @@ def chip_top_runner():
         if scl_prim.exists():
             sources.append(scl_prim)
         sources += [
-            # ao211_2 / aoi211_2 / oai211_2 stubs (missing from upstream .v
-            # but present in .lib and used by yosys).
+            # Extra behavioral models/stubs for cells used by the netlist but
+            # missing from the simulator-friendly std-cell model.
             proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3_missing_cells.v",
+
+            # IO pad models.
             io_v,
             ws_io_v,
-            # Behavioural models for the OCD 3.3V SRAM macros (PDK only ships
-            # blackboxes for these). See sim/gf180mcu_ocd_ip_sram_models.v.
+
+            # SRAM behavioral models.
             proj_path / "../sim/gf180mcu_ocd_ip_sram_models.v",
+
+            # Gate-level netlist.
             gl_netlist,
         ]
         # Post-synthesis (.nl.v) has NO power pins; post-PnR (.pnl.v) does.
         # Auto-detect from filename so the same runner works for both.
         use_power_pins = gl_netlist.name.endswith(".pnl.v")
-        # `functional` (lowercase) is what gf180mcu_fd_io.v gates on for its
-        # behavioural model. Pass both case variants so any cell-library that
-        # historically uses FUNCTIONAL also picks up the behavioural path.
-        defines = {"functional": True, "FUNCTIONAL": True}
+        # `functional` (lowercase) gates IO pad behavioural models in
+        # gf180mcu_fd_io.v and must always be set for GLS.
+        # Uppercase `FUNCTIONAL` suppresses `specify` blocks in the PDK cell
+        # models (gf180mcu_as_sc_mcu7t3v3.v uses `ifndef FUNCTIONAL guards).
+        # For timed STA GLS (TIMING=1) the SDF annotator needs those specify
+        # blocks active, so we must NOT define FUNCTIONAL in that mode.
+        # For plain functional GLS the specify blocks add overhead with no
+        # benefit, so we keep FUNCTIONAL defined to suppress them.
+        defines = {"functional": True}
+        if not timing:
+            # Functional GLS only: suppress specify blocks for faster compile.
+            defines["FUNCTIONAL"] = True
         if use_power_pins:
             defines["USE_POWER_PINS"] = True
         print(f"[chip_top_tb] GLS netlist: {gl_netlist}")
@@ -1531,26 +1579,57 @@ def chip_top_runner():
     test_filter = os.getenv("COCOTB_TEST_FILTER")    # regex; None = all tests
     results_xml = os.getenv("RESULTS_XML")           # absolute path or None
 
+    hdl_top_for_sim = hdl_toplevel
+
+    if timing:
+        if not gl:
+            raise ValueError("TIMING=1 requires GL=1 because SDF applies to the gate-level netlist.")
+
+        if sim != "icarus":
+            raise ValueError("Timed SDF GLS should use SIM=icarus.")
+
+        if not sdf_file:
+            raise ValueError("TIMING=1 was set, but SDF_FILE was not provided.")
+
+        if not Path(sdf_file).exists():
+            raise FileNotFoundError(f"SDF file not found: {sdf_file}")
+
+        sources.append(proj_path / "../sim/chip_top_sdf_wrapper.sv")
+        hdl_top_for_sim = "chip_top_sdf_wrapper"
+
+        build_args += [
+            "-gspecify",
+            "-ginterconnect",
+            f'-DSDF_FILE="{sdf_file}"',
+        ]
+
+        print(f"[chip_top_tb] Timed GLS enabled with SDF: {sdf_file}")
+
+    print(f"[chip_top_tb] HDL top for simulation: {hdl_top_for_sim}")
+
+    force_rebuild = os.getenv("FORCE_REBUILD", "0").lower() not in ("", "0", "false", "no")
+    waves_enabled = os.getenv("WAVES", "1").lower() not in ("", "0", "false", "no")
+
     runner = get_runner(sim)
     runner.build(
         sources=sources,
-        hdl_toplevel=hdl_toplevel,
+        hdl_toplevel=hdl_top_for_sim,
         defines=defines,
-        always=True,
+        always=force_rebuild,
         includes=includes,
         build_args=build_args,
         build_dir=sim_build,
-        waves=True,
+        waves=waves_enabled,
     )
 
     runner.test(
-        hdl_toplevel=hdl_toplevel,
+        hdl_toplevel=hdl_top_for_sim,
         test_module="chip_top_tb,",
         plusargs=[],
         build_dir=sim_build,
         test_filter=test_filter,
         results_xml=results_xml,
-        waves=True,
+        waves=waves_enabled,
     )
 
 
