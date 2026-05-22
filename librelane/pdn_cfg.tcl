@@ -16,6 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set fp [open "/tmp/macro_instances.txt" w]
+foreach inst [[ord::get_db_block] getInsts] {
+    if { [$inst isBlock] } {
+        puts $fp "[$inst getName]"
+    }
+}
+close $fp
+
 source $::env(SCRIPTS_DIR)/openroad/common/io.tcl
 source $::env(SCRIPTS_DIR)/openroad/common/set_global_connections.tcl
 set_global_connections
