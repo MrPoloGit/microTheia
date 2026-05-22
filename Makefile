@@ -107,13 +107,10 @@ lint: ## Lint all SystemVerilog files in src
 	          $(SV_SRCS)
 .PHONY: lint
 
- # $(MAKE) sim-chip-top; \
 
 sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	@if [ -z "$(DUT)" ]; then \
-		echo "Error: You must specify DUT=<module_name>"; \
-		echo "Example: make sim DUT=voxel_bin_top"; \
-		exit 1; \
+		$(MAKE) sim-chip-top; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
 		$(MAKE) sim-chip-top; \
 	else \
@@ -316,3 +313,7 @@ ice40-clean: ## Cleans out all ice40 logic
 clean: ## Cleans the generated files
 	rm -rf results.xml sim_build/
 .PHONY: clean
+
+clean-runs: ## Cleans all the runs output
+	rm -rf librelane/runs/
+.PHONY: clean-runs
