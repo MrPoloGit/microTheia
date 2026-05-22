@@ -107,9 +107,13 @@ lint: ## Lint all SystemVerilog files in src
 	          $(SV_SRCS)
 .PHONY: lint
 
+ # $(MAKE) sim-chip-top; \
+
 sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	@if [ -z "$(DUT)" ]; then \
-	    $(MAKE) sim-chip-top; \
+		echo "Error: You must specify DUT=<module_name>"; \
+		echo "Example: make sim DUT=voxel_bin_top"; \
+		exit 1; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
 		$(MAKE) sim-chip-top; \
 	else \
