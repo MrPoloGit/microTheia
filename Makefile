@@ -64,6 +64,13 @@ install-3v3-scl: ## Install the 3.3V standard cell library into the PDK
 	cp $(MAKEFILE_DIR)/librelane/gf180mcu_as_sc_mcu7t3v3_config.tcl $(PDK_ROOT)/$(PDK)/libs.tech/librelane/gf180mcu_as_sc_mcu7t3v3/config.tcl
 .PHONY: install-3v3-scl
 
+config-pdk:
+	$(MAKE) clone-pdk
+	$(MAKE) install-3v3-scl
+	git lfs pull
+	git submodule update --init third_party/verilog_spi
+.PHONY: config-pdk
+
 librelane: ## Run LibreLane flow (synthesis, PnR, verification)
 	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk
 .PHONY: librelane
@@ -102,9 +109,7 @@ lint: ## Lint all SystemVerilog files in src
 
 sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	@if [ -z "$(DUT)" ]; then \
-		echo "Error: You must specify DUT=<module_name>"; \
-		echo "Example: make sim DUT=voxel_bin_top"; \
-		exit 1; \
+	    $(MAKE) sim-chip-top; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
 		$(MAKE) sim-chip-top; \
 	else \

@@ -10,10 +10,11 @@ Make sure Git and Git LFS are installed.
 ```bash
 git clone git@github.com:dolphin-530/microTheia.git
 cd microTheia
-make clone-pdk
-make install-3v3-scl
-git submodule update --init third_party/verilog_spi
-git lfs pull
+make config-pdk
+make sim
+make librelane
+make sim-gl
+make sim-sdf # (like sim-gl but with SDF back-annotated)
 ```
 
 Ensure [Docker](https://www.docker.com/) is installed and start the devcontainer. You can also open this repository in a github codespace.
@@ -178,6 +179,7 @@ To check whether our design is suitable for manufacturing, run the [gf180mcu-pre
 - For more comprehensive SystemVerilog support, enable the `USE_SLANG` variable in the LibreLane configuration.
 - https://github.com/chipsalliance/chisel-template
 - https://github.com/wafer-space/gf180mcu-project-template
+- https://github.com/VLSIDA/gf180mcu-project-template/tree/3v3-libraries
 - https://github.com/Jilin-Zhang/ASYNC-Chisel
 - https://github.com/jasonwaseq/FPGA-DVS-Gesture-Classifier
 - https://github.com/jasonwaseq/Verilog-Memory-Hardware
