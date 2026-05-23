@@ -31,8 +31,8 @@ SENSOR_HEIGHT    = CFG.get("SENSOR_HEIGHT", SENSOR_WIDTH)
 COUNTER_BITS     = CFG.get("COUNTER_BITS", 4)
 NUM_CLASSES      = CFG.get("NUM_CLASSES", 4)
 
-BIN_DURATION_MS          = WINDOW_MS // READOUT_BINS
-BIN_DURATION_US          = BIN_DURATION_MS * 1000
+BIN_DURATION_MS          = WINDOW_MS / READOUT_BINS
+BIN_DURATION_US          = int(BIN_DURATION_MS * 1000)
 X_BIN_DIV                = SENSOR_WIDTH // GRID_SIZE
 Y_BIN_DIV                = SENSOR_HEIGHT // GRID_SIZE
 DIV_K                    = 12
@@ -97,14 +97,14 @@ def build_evt2_cd(pkt_type, x_sensor, y_sensor, ts_lsb):
 
 
 def build_weight_word(weight_data, weight_addr, sram_addr):
-    """EVT_WEIGHT = 0x2: [31:28]=type [27:20]=data [19:9]=addr [8:7]=sram_sel"""
+    """EVT_WEIGHT = 0x2: [31:28]=type [27:20]=data [19:8]=addr [7:2]=sram_sel"""
     return (0x2 << 28) | ((weight_data & 0xFF) << 20) | \
-           ((weight_addr & 0x7FF) << 9) | ((sram_addr & 0x3) << 7)
+           ((weight_addr & 0xFFF) << 8) | ((sram_addr & 0x3F) << 2)
 
 
-def build_thresh_upper_word(upper18):
-    """EVT_THRESH_U = 0x3: [31:28]=type [27:10]=upper 18 bits of threshold"""
-    return (0x3 << 28) | ((upper18 & 0x3FFFF) << 10)
+def build_thresh_upper_word(upper19):
+    """EVT_THRESH_U = 0x3: [31:28]=type [27:9]=upper 19 bits of threshold"""
+    return (0x3 << 28) | ((upper19 & 0x7FFFF) << 9)
 
 
 def build_thresh_lower_word(lower18, addr):
@@ -195,9 +195,9 @@ async def deposit_weights_and_thresholds(dut, weights, thresholds):
 
     for addr in range(2 * NUM_CLASSES):
         val = int(thresholds[addr])
-        upper18 = (val >> 18) & 0x3FFFF
+        upper19 = (val >> 19) & 0x7FFFF
         lower18 = val & 0x3FFFF
-        await _send_raw_word(dut, build_thresh_upper_word(upper18))
+        await _send_raw_word(dut, build_thresh_upper_word(upper19))
         await _send_raw_word(dut, build_thresh_lower_word(lower18, addr))
 
     await _send_raw_word(dut, EVT_READS_DONE_WORD)
@@ -769,8 +769,9 @@ async def test_voxel_bin_core_end_to_end_golden(dut):
     ]
 
     for region in script:
-        await drive_bin_traffic(h, rng, region, events=30)
-        await h.force_bin_rollover()
+        for _ in range(2):
+            await drive_bin_traffic(h, rng, region, events=30)
+            await h.force_bin_rollover()
 
     await h.wait_quiet()
 
@@ -981,8 +982,9 @@ async def test_score_model_validates_classifications(dut):
         "bottom", "top", "right", "left",
     ]
     for region in script:
-        await drive_bin_traffic(h, rng, region, events=30)
-        await h.force_bin_rollover()
+        for _ in range(2):
+            await drive_bin_traffic(h, rng, region, events=30)
+            await h.force_bin_rollover()
 
     await h.wait_quiet()
 
@@ -1246,9 +1248,10 @@ async def test_windowing_strategy_matches_sliding_model(dut):
     await h.send_word(build_evt2_time_high(0x45678))
 
     script = ["left", "right", "top", "bottom"] * 4
-    for region in script[: READOUT_BINS + 3]:
-        await drive_bin_traffic(h, rng, region, events=28)
-        await h.force_bin_rollover()
+    for region in script:
+        for _ in range(2):
+            await drive_bin_traffic(h, rng, region, events=28)
+            await h.force_bin_rollover()
     await h.wait_quiet()
 
     assert len(h.window_features) >= 3, "Need >=3 windows to validate sliding behavior"
@@ -1733,7 +1736,7 @@ async def test_boot_with_weights_enables_correct_classification(dut):
 
     # Now exercise the full pipeline with the harness (clock already running)
     rng = random.Random(0x1357_9BDF)
-    h = CoreHarness(dut, score_model=score_model, check_feature_windows=False)
+    h = CoreHarness(dut, score_model=score_model, check_feature_windows=True)
     # Sync harness accepted_words with current debug_event_count (boot words already counted)
     h.accepted_words = int(dut.debug_event_count.value)
 

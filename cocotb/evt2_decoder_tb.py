@@ -16,6 +16,7 @@ CFG = load_config(MODULE)
 GRID_SIZE     = CFG["GRID_SIZE"]
 SENSOR_WIDTH  = CFG["SENSOR_WIDTH"]
 SENSOR_HEIGHT = CFG["SENSOR_HEIGHT"]
+FEATURE_COUNT = CFG["FEATURE_COUNT"]
 MAP_SWAP_XY = CFG.get("MAP_SWAP_XY", 0)
 MAP_FLIP_X = CFG.get("MAP_FLIP_X", 0)
 MAP_FLIP_Y = CFG.get("MAP_FLIP_Y", 0)
@@ -411,10 +412,10 @@ async def test_weight_packet(dut):
     dut.evt_ld_en.value = 1
 
     weight = 0xAB
-    addr   = 0x7F2
-    sram   = 0x2
+    addr   = 0x001
+    sram   = 0x00
 
-    payload = (weight << 20) | (addr << 9) | (sram << 7)
+    payload = (weight << 20) | (addr << 8) | (sram << 2)
     word = make_word(0x2, payload)
 
     await send_word(dut, word)
@@ -446,18 +447,26 @@ async def test_threshold_upper_lower(dut):
 
     dut.evt_ld_en.value = 1
 
-    upper = 0x2AAAA
-    lower = 0x15555
+    upper = 0x7AAAA
+    lower = 0x35555
     addr  = 0x3
 
-    upper_payload = upper << 10
+    upper_payload = upper << 9
     lower_payload = (lower << 10) | (addr << 7)
 
     await send_word(dut, make_word(0x3, upper_payload))  # U
     await send_word(dut, make_word(0x4, lower_payload))  # L
 
     expected = (upper << 18) | lower
-
+    print(bin(expected))
+    print(bin(upper_payload))
+    print(dut.thresh_data_o.value)
+    print(f"upper      = {upper:019b}")
+    print(f"payload    = {upper_payload:028b}")
+    print(f"evt_word   = {make_word(0x3, upper_payload):032b}")
+    print("thresh_data_o width:", len(dut.thresh_data_o))
+    print("thresh_data_o int   :", int(dut.thresh_data_o.value))
+    print("thresh_data_o bin   :", format(int(dut.thresh_data_o.value), '037b'))
     assert dut.thresh_event_valid.value == 1
     assert dut.event_valid.value == 0
     assert dut.thresh_data_o.value == expected

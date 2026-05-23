@@ -8,43 +8,43 @@
 module evt2_decoder #(
     parameter int SENSOR_WIDTH      = 320,
     parameter int SENSOR_HEIGHT     = 320,
+    parameter int FEATURE_COUNT     = 4096,
     parameter int GRID_SIZE         = 16,
-    parameter int SCORE_BITS        = 36,
+    parameter int SCORE_BITS        = 37,
     parameter int WEIGHT_BITS       = 8,
     parameter bit REQUIRE_TIME_HIGH = 1'b1,
     parameter bit SWAP_INPUT_BYTES  = 1'b0
 )(
-    input  logic                         clk,
-    input  logic                         rst,
-    input  logic [31:0]                  data_in,
-    input  logic                         data_valid,
-    input  logic                         event_ready_i,
-    input  logic                         evt_ld_en,
-    output logic                         data_ready,
-    output logic [$clog2(GRID_SIZE)-1:0] x_out,
-    output logic [$clog2(GRID_SIZE)-1:0] y_out,
-    output logic                         event_valid,
-    output logic                         evt_reads_done,
-    output logic [10:0]                  weight_addr_o,
-    output logic [WEIGHT_BITS-1:0]       weight_data_o,
-    output logic [1:0]                   weight_sram_addr_o,
-    output logic                         weight_event_valid,
-    output logic [SCORE_BITS-1:0]        thresh_data_o,
-    output logic [2:0]                   thresh_addr_o,
-    output logic                         thresh_event_valid,
-    output logic [33:0]                  ts_out,
-    output logic [33:0]                  bin_length_us,
-    output logic                         bin_length_valid,
-    output logic                         debug_req_o,
-    output logic                         reload_req_o,
-    output logic                         boot_req_o,
-    output logic [11:0]                  decoder_dbg,
-    output logic [31:0]                  decoder_output_dbg,
-    output logic [3:0]                   debug_page_sel
+    input  logic                             clk,
+    input  logic                             rst,
+    input  logic [31:0]                      data_in,
+    input  logic                             data_valid,
+    input  logic                             event_ready_i,
+    input  logic                             evt_ld_en,
+    output logic                             data_ready,
+    output logic [$clog2(GRID_SIZE)-1:0]     x_out,
+    output logic [$clog2(GRID_SIZE)-1:0]     y_out,
+    output logic                             event_valid,
+    output logic                             evt_reads_done,
+    output logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_o,
+    output logic [WEIGHT_BITS-1:0]           weight_data_o,
+    output logic [5:0]                       weight_sram_addr_o,
+    output logic                             weight_event_valid,
+    output logic [SCORE_BITS-1:0]            thresh_data_o,
+    output logic [2:0]                       thresh_addr_o,
+    output logic                             thresh_event_valid,
+    output logic [33:0]                      ts_out,
+    output logic [33:0]                      bin_length_us,
+    output logic                             bin_length_valid,
+    output logic                             debug_req_o,
+    output logic                             reload_req_o,
+    output logic                             boot_req_o,
+    output logic [11:0]                      decoder_dbg,
+    output logic [31:0]                      decoder_output_dbg,
+    output logic [3:0]                       debug_page_sel
 );
 
     localparam int GRID_BITS  = $clog2(GRID_SIZE);
-
     localparam logic [3:0] EVT_CD_OFF     = 4'h0;
     localparam logic [3:0] EVT_CD_ON      = 4'h1;
     localparam logic [3:0] EVT_WEIGHT     = 4'h2;
@@ -52,10 +52,13 @@ module evt2_decoder #(
     localparam logic [3:0] EVT_THRESH_L   = 4'h4;
     localparam logic [3:0] BIN_LENGTH_U   = 4'h5;
     localparam logic [3:0] BIN_LENGTH_L   = 4'h6;
+
     localparam logic [3:0] EVT_TIME_HIGH  = 4'h8;
+
     localparam logic [3:0] DEBUG_REQ      = 4'ha;
     localparam logic [3:0] RELOAD_REQ     = 4'hb;
     localparam logic [3:0] BOOT_REQ       = 4'hc;
+
     localparam logic [3:0] DEBUG_PAGE     = 4'he;
     localparam logic [3:0] EVT_READS_DONE = 4'hf;
 
@@ -101,28 +104,28 @@ module evt2_decoder #(
     assign data_ready = (!is_cd) || event_ready_i;
 
     // State registers (_q) and next-state signals (_d)
-    logic                  have_time_high_q,      have_time_high_d;
-    logic [27:0]           time_high_reg_q,       time_high_reg_d;
-    logic [GRID_BITS-1:0]  x_out_q,               x_out_d;
-    logic [GRID_BITS-1:0]  y_out_q,               y_out_d;
-    logic [33:0]           ts_out_q,              ts_out_d;
-    logic                  event_valid_q,          event_valid_d;
-    logic                  weight_event_valid_q,   weight_event_valid_d;
-    logic                  thresh_event_valid_q,   thresh_event_valid_d;
-    logic                  evt_reads_done_q,       evt_reads_done_d;
-    logic [17:0]           thresh_reg_q,           thresh_reg_d;
-    logic [10:0]           weight_addr_q,          weight_addr_d;
-    logic [WEIGHT_BITS-1:0] weight_data_q,         weight_data_d;
-    logic [1:0]            weight_sram_addr_q,     weight_sram_addr_d;
-    logic [SCORE_BITS-1:0] thresh_data_q,          thresh_data_d;
-    logic [2:0]            thresh_addr_q,          thresh_addr_d;
-    logic [3:0]            debug_page_sel_q,       debug_page_sel_d;
-    logic                  boot_req_q,             boot_req_d;
-    logic                  reload_req_q,           reload_req_d;
-    logic                  debug_req_q,            debug_req_d;
-    logic [33:0]           bin_length_us_q,        bin_length_us_d;
-    logic                  bin_length_valid_q,     bin_length_valid_d;
-    logic [16:0]           bin_length_reg_q,       bin_length_reg_d;
+    logic                             have_time_high_q,       have_time_high_d;
+    logic [27:0]                      time_high_reg_q,        time_high_reg_d;
+    logic [GRID_BITS-1:0]             x_out_q,                x_out_d;
+    logic [GRID_BITS-1:0]             y_out_q,                y_out_d;
+    logic [33:0]                      ts_out_q,               ts_out_d;
+    logic                             event_valid_q,          event_valid_d;
+    logic                             weight_event_valid_q,   weight_event_valid_d;
+    logic                             thresh_event_valid_q,   thresh_event_valid_d;
+    logic                             evt_reads_done_q,       evt_reads_done_d;
+    logic [18:0]                      thresh_reg_q,           thresh_reg_d;
+    logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_q,          weight_addr_d;
+    logic [WEIGHT_BITS-1:0]           weight_data_q,          weight_data_d;
+    logic [5:0]                       weight_sram_addr_q,     weight_sram_addr_d;
+    logic [SCORE_BITS-1:0]            thresh_data_q,          thresh_data_d;
+    logic [2:0]                       thresh_addr_q,          thresh_addr_d;
+    logic [3:0]                       debug_page_sel_q,       debug_page_sel_d;
+    logic                             boot_req_q,             boot_req_d;
+    logic                             reload_req_q,           reload_req_d;
+    logic                             debug_req_q,            debug_req_d;
+    logic [33:0]                      bin_length_us_q,        bin_length_us_d;
+    logic                             bin_length_valid_q,     bin_length_valid_d;
+    logic [16:0]                      bin_length_reg_q,       bin_length_reg_d;
 
     // Next-state combinational block
     always_comb begin
@@ -169,16 +172,16 @@ module evt2_decoder #(
 
                 EVT_WEIGHT: begin
                     if (evt_ld_en) begin
-                        weight_data_d      = evt_word[27:20];
-                        weight_addr_d      = evt_word[19:9];
-                        weight_sram_addr_d = evt_word[8:7];
+                        weight_data_d        = evt_word[27:20];
+                        weight_addr_d        = evt_word[19:8];
+                        weight_sram_addr_d   = evt_word[7:2];
                         weight_event_valid_d = 1'b1;
                     end
                 end
 
                 EVT_THRESH_U: begin
                     if (evt_ld_en) begin
-                        thresh_reg_d = evt_word[27:10];
+                        thresh_reg_d = evt_word[27:9];
                     end
                 end
 

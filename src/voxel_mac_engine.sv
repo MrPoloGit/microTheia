@@ -3,7 +3,7 @@
 `timescale 1ns/1ps
 
 module voxel_mac_engine #(
-    parameter int FEATURE_COUNT = 2048,
+    parameter int FEATURE_COUNT = 4096,
     parameter int COUNTER_BITS  = 16,
     parameter int WEIGHT_BITS   = 8,
     parameter int NUM_CLASSES   = 4,
@@ -57,10 +57,10 @@ module voxel_mac_engine #(
 
     //score busses for debug pins
     //only taking lower 32 bits from each score
-    assign score_A = scores_flat[31:0];       // from [35:0]
-    assign score_B = scores_flat[67:36];      // from [71:36]
-    assign score_C = scores_flat[103:72];     // from [107:72]
-    assign score_D = scores_flat[139:108];    // from [143:108]
+    assign score_A = scores_flat[31:0];       // from [36:0]
+    assign score_B = scores_flat[68:37];      // from [73:37]
+    assign score_C = scores_flat[105:74];     // from [110:74]
+    assign score_D = scores_flat[142:111];    // from [147:111]
 
     always_ff @(posedge clk) begin
         if (rst) begin
