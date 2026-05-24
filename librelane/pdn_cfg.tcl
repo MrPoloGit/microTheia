@@ -16,7 +16,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set fp [open "/tmp/macro_instances.txt" w]
+set macro_instances_file [file join [pwd] "macro_instances.txt"]
+set fp [open $macro_instances_file w]
 foreach inst [[ord::get_db_block] getInsts] {
     if { [$inst isBlock] } {
         puts $fp "[$inst getName]"

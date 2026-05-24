@@ -219,3 +219,29 @@ endspecify
 endmodule
 
 `endif
+
+`ifndef GF180MCU_AS_SC_MCU7T3V3_DLYBUFF_2_MISSING_MODEL
+`define GF180MCU_AS_SC_MCU7T3V3_DLYBUFF_2_MISSING_MODEL
+
+module gf180mcu_as_sc_mcu7t3v3__dlybuff_2 (
+`ifdef USE_POWER_PINS
+    inout VDD,
+    inout VNW,
+    inout VPW,
+    inout VSS,
+`endif
+    input A,
+    output Y
+);
+    assign Y = A;
+
+`ifndef FUNCTIONAL
+specify
+      (posedge A => (Y:A)) = (0:0:0, 0:0:0);
+      (negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+`endif
