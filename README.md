@@ -13,6 +13,7 @@ Make sure Git and Git LFS are installed.
 git clone git@github.com:dolphin-530/microTheia.git
 cd microTheia
 make config-pdk
+nix-shell
 make sim
 make librelane
 make sim-gl
