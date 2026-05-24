@@ -7,7 +7,7 @@
 #   - spi_ready asserts after reset
 #   - SPI boot/page-select works on the default SPI bus (input_PAD[5,6,7])
 #   - Toggling input_PAD[8] (ALT_INPUT_MODE) switches the active SPI interface
-#     and the active MISO pin (bidir_PAD[0] ↔ bidir_PAD[1])
+#     and the active MISO pin (bidir_PAD[38] ↔ bidir_PAD[39])
 #   - The alt SPI bus (input_PAD[2,3,4]) is functional after the toggle
 #   - A second toggle returns the chip to the default interface
 #   - Debug pages 0-4 can be selected over SPI and the debug_bus (bidir_PAD[37:6])
@@ -98,11 +98,11 @@ PIN_ALT_CS   = 4
 PIN_ALT_MODE = 8   # rising edge toggles alt_select flip-flop
 
 # bidir_PAD output indices
-BPIN_DEF_MISO  = 0
-BPIN_ALT_MISO  = 1
+BPIN_HEARTBEAT = 0
+BPIN_SPI_READY = 1
 BPIN_DBG_LO    = 6   # debug_bus[0]
-BPIN_HEARTBEAT = 38
-BPIN_SPI_READY = 39
+BPIN_DEF_MISO  = 38
+BPIN_ALT_MISO  = 39
 
 # ── EVT2 command word builders ────────────────────────────────────────────────
 # Encodings match soc_tb.py / control_fsm
@@ -180,20 +180,20 @@ def _bidir_bit(dut, idx):
 
 async def _wait_spi_ready(dut, max_cycles=5000):
     """
-    Pin-level read of spi_ready (exposed on bidir_PAD[39]).
+    Pin-level read of spi_ready (exposed on bidir_PAD[1]).
 
     Reading via the pin (instead of the internal i_chip_core.spi_ready signal)
-    validates the full output path: chip_core's `assign bidir_out[39] = spi_ready`,
-    `bidir_oe[39] = 1'b1`, the IO pad model, and the inout bidir_PAD wire.
+    validates the full output path: chip_core's `assign bidir_out[1] = spi_ready`,
+    `bidir_oe[1] = 1'b1`, the IO pad model, and the inout bidir_PAD wire.
     A bit-mapping bug in chip_core.sv would silently break the chip in
     production but go unnoticed if we read the internal signal.
     """
     for n in range(max_cycles):
         await RisingEdge(dut.clk_PAD)
         if _bidir_bit(dut, BPIN_SPI_READY) == 1:
-            dut._log.info(f"spi_ready asserted on bidir_PAD[39] after {n} cycles")
+            dut._log.info(f"spi_ready asserted on bidir_PAD[1] after {n} cycles")
             return
-    raise AssertionError("spi_ready never asserted on bidir_PAD[39] after reset")
+    raise AssertionError("spi_ready never asserted on bidir_PAD[1] after reset")
 
 
 def _read_bidir_bit(dut, idx):
@@ -237,8 +237,8 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     """
     Mode-0 SPI stream. CS stays low for the whole burst.
 
-    alt=False uses input_PAD[5,6,7] / bidir_PAD[0].
-    alt=True  uses input_PAD[2,3,4] / bidir_PAD[1].
+    alt=False uses input_PAD[5,6,7] / bidir_PAD[38].
+    alt=True  uses input_PAD[2,3,4] / bidir_PAD[39].
 
     progress_every: emit a progress log every N words.  0 = no progress logs.
     Used by long EVT2 recording streams (~249K words) so the user can see the
@@ -325,7 +325,7 @@ async def _spi_xfer(dut, pins, word, *, alt=False, tag="spi_xfer"):
 @cocotb.test(timeout_time=2, timeout_unit="ms")
 async def test_reset_and_spi_ready(dut):
     """
-    After reset, chip must assert spi_ready (bidir_PAD[39]) within 5000 cycles.
+    After reset, chip must assert spi_ready (bidir_PAD[1]) within 5000 cycles.
     Validates the chip_top startup path through IO pads, clock domain, SPI init.
     """
     pins = await _startup(dut)
@@ -343,7 +343,7 @@ async def test_default_spi_boot_and_miso(dut):
 
     Default SPI path (alt_select=0):
       SCLK → input_PAD[5], MOSI → input_PAD[6], CS → input_PAD[7]
-      MISO ← bidir_PAD[0]
+      MISO ← bidir_PAD[38]
     """
     pins = await _startup(dut)
 
@@ -401,16 +401,16 @@ async def test_alt_input_mode_toggle(dut):
     Toggle ALT_INPUT_MODE (input_PAD[8]) once to flip alt_select from 0 → 1.
 
     Verifies:
-      - MISO output enable moves from bidir_PAD[0] to bidir_PAD[1].
+      - MISO output enable moves from bidir_PAD[38] to bidir_PAD[39].
       - SPI transactions via the alt pin set (input_PAD[2,3,4]) succeed.
-      - bidir_PAD[0] is driven low (MISO_wire muxed to 0) in alt mode.
+      - bidir_PAD[38] is driven low (MISO_wire muxed to 0) in alt mode.
 
     The pin is double-synchronized inside chip_core, so the rising edge must
     be held for at least 3 chip-clock cycles to reliably propagate.
     """
     pins = await _startup(dut)
 
-    # --- baseline: default SPI works, MISO on bidir_PAD[0] ---
+    # --- baseline: default SPI works, MISO on bidir_PAD[38] ---
     await _spi_stream(dut, pins, [_boot_req()], alt=False, tag="boot_def")
     await ClockCycles(dut.clk_PAD, 20)
 
@@ -428,20 +428,20 @@ async def test_alt_input_mode_toggle(dut):
     await ClockCycles(dut.clk_PAD, 8)
 
     # --- alt SPI (input_PAD[2,3,4]) should now be active ---
-    dut._log.info("Testing alt SPI path (input_PAD[2,3,4], MISO=bidir_PAD[1])...")
+    dut._log.info("Testing alt SPI path (input_PAD[2,3,4], MISO=bidir_PAD[39])...")
     miso_alt = await _spi_xfer(dut, pins, _debug_page(0),
                                 alt=True, tag="miso_alt")
     dut._log.info(f"Alt MISO (after toggle) = 0x{miso_alt:08X}")
 
-    # In alt mode, bidir_out[0] is forced to 0 and bidir_oe[0]=0 (output disabled)
-    # bidir_PAD[0] should read 0 because the pad drives 0 when OE=0 (or Z from pad)
+    # In alt mode, bidir_out[38] is forced to 0 and bidir_oe[38]=0 (output disabled)
+    # bidir_PAD[38] should read 0 because the pad drives 0 when OE=0 (or Z from pad)
     def_miso_pad = _read_bidir_bit(dut, BPIN_DEF_MISO)
     assert def_miso_pad == 0, (
-        f"bidir_PAD[0] should be 0 while alt_select=1 (driven to 0, OE=0), "
+        f"bidir_PAD[38] should be 0 while alt_select=1 (driven to 0, OE=0), "
         f"got {def_miso_pad}"
     )
 
-    dut._log.info("PASS: alt_select toggled; alt SPI functional, bidir_PAD[0]=0")
+    dut._log.info("PASS: alt_select toggled; alt SPI functional, bidir_PAD[38]=0")
 
 
 @cocotb.test(timeout_time=2, timeout_unit="ms")
@@ -474,10 +474,10 @@ async def test_alt_input_mode_toggle_back(dut):
                             alt=False, tag="miso_restored")
     dut._log.info(f"MISO after double-toggle = 0x{miso:08X}")
 
-    # bidir_PAD[1] (alt MISO) should be 0: bidir_out[1] driven to 0, OE[1]=0
+    # bidir_PAD[39] (alt MISO) should be 0: bidir_out[39] driven to 0, OE[39]=0
     alt_pad = _read_bidir_bit(dut, BPIN_ALT_MISO)
     assert alt_pad == 0, (
-        f"bidir_PAD[1] should be 0 after returning to default mode, got {alt_pad}"
+        f"bidir_PAD[39] should be 0 after returning to default mode, got {alt_pad}"
     )
 
     dut._log.info("PASS: double toggle restores default SPI interface")

@@ -49,11 +49,12 @@ module chip_core #(
     // multiple drivers on bits that are also driven by bit-select assigns below,
     // which produces X in simulation. Only the truly unused reserved bits get '0.
     assign bidir_oe[5:2] = '0; // reserved pins, output disabled
-    // debug + heartbeat + spi_ready
+    // debug + heartbeat + spi_ready always-on; MISO pins (38/39) are gated by
+    // alt_select below so the inactive MISO can be driven by an off-chip
+    // master if desired.
     assign bidir_oe[37:6] = '1;
-    assign bidir_oe[38]   = 1'b1;
-    assign bidir_oe[39]   = 1'b1;
-     // pins 0 and 1 are assigned after soc module along with alternate mux pin logic
+    assign bidir_oe[0]    = 1'b1;   // heartbeat — always observable
+    assign bidir_oe[1]    = 1'b1;   // spi_ready — always observable
     assign bidir_out[5:2] = '0; // reserved pins driven to 0
 
 
@@ -137,8 +138,8 @@ module chip_core #(
     //muxing MISO to output pins, and disabling output for inactive ports
     assign bidir_out[38] =  !alt_select ? MISO_wire : 1'b0;
     assign bidir_out[39] = alt_select ? MISO_wire : 1'b0;
-    assign bidir_oe[0] = !alt_select;  // active default MISO
-    assign bidir_oe[1] = alt_select;  // active alternative MISO
+    assign bidir_oe[38] = !alt_select; // default MISO pin active when alt_select=0
+    assign bidir_oe[39] = alt_select;  // alternative MISO pin active when alt_select=1
 
     //heartbeat signal, approx 1 sec on and 1 sec off
     logic [24:0] counter;
@@ -148,7 +149,7 @@ module chip_core #(
         else
             counter <= counter + 1'b1;
     end
-    assign bidir_out[0] = counter[24]; //bidirect pin 38 is heartbeat signal.
+    assign bidir_out[0] = counter[24]; //bidirect pin 0 is heartbeat signal.
 
 endmodule
 
