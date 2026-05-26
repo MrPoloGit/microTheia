@@ -1,4 +1,7 @@
 # μTheia
+μTheia is a GF180MCU event-based machine vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16×16 spatial grid, bins events into 8 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports pattern detection for the 4 programmable classes through SPI or selectable physical debug/output pins.
+
+<img width="707" height="916" alt="image" src="https://github.com/user-attachments/assets/6946b43c-fa27-4db2-a234-15927c1d33fe" />
 
 Project uses wafer.space MPW and runs using the gf180mcu PDK.
 
@@ -9,10 +12,12 @@ Make sure Git and Git LFS are installed.
 ```bash
 git clone git@github.com:dolphin-530/microTheia.git
 cd microTheia
-make clone-pdk
-make install-3v3-scl
-git submodule update --init third_party/verilog_spi
-git lfs pull
+make config-pdk
+nix-shell
+make sim
+make librelane
+make sim-gl
+make sim-sdf # (like sim-gl but with SDF back-annotated)
 ```
 
 Ensure [Docker](https://www.docker.com/) is installed and start the devcontainer. You can also open this repository in a github codespace.
@@ -155,19 +160,6 @@ Once synthesized and having a working bitstream to flash and test, go into the [
 
 Run `pip install -r scripts/requirements.txt` for RTL simulation, or `pip install -r ice40/requirements.txt` for FPGA tools.
 
-## Pin Assignment (INCOMPLETE)
-
-| Signal | Pins | Direction | Type | Notes |
-|--------|------|-----------|------|-------|
-| clk | 1 | in | Clock | System clock |
-| rst | 1 | in | Reset | Active high |
-| event_data[7:0] | 8 | in | Data | EVT2.0 events (32-bit over 4 cycles) |
-| event_valid | 1 | in | Handshake | Data valid |
-| event_ready | 1 | out | Handshake | Ready to accept |
-| spi_clk, spi_mosi, spi_miso, spi_cs | 4 | in/out | SPI | Configuration interface |
-| uart_tx, uart_rx | 2 | in/out | UART | Debug/output |
-| debug[N:0] | M | out | Debug | Tied to VSS when not used |
-
 ## Third Party
 - https://github.com/google/globalfoundries-pdk-ip-gf180mcu_fd_ip_sram
 
@@ -190,6 +182,7 @@ To check whether our design is suitable for manufacturing, run the [gf180mcu-pre
 - For more comprehensive SystemVerilog support, enable the `USE_SLANG` variable in the LibreLane configuration.
 - https://github.com/chipsalliance/chisel-template
 - https://github.com/wafer-space/gf180mcu-project-template
+- https://github.com/VLSIDA/gf180mcu-project-template/tree/3v3-libraries
 - https://github.com/Jilin-Zhang/ASYNC-Chisel
 - https://github.com/jasonwaseq/FPGA-DVS-Gesture-Classifier
 - https://github.com/jasonwaseq/Verilog-Memory-Hardware
