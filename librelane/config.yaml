@@ -112,25 +112,21 @@ LVS_IGNORE_CELLS:
 # Clock
 CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y
-CLOCK_PERIOD: 15.625 # 64 MHz, need to add SPI clock in sdc file for 32 MHz
+CLOCK_PERIOD: 15.625 # 64 MHz
 
 # Fix hold violations
 PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
 GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
 
 # new settings to try from from ethan's list
-# current best results are clean setup/hold, clean slew, and 128 cap violations
-# for cap vios: half of which might be okay to ignore (pin constraints issue maybe?), other half all within clock tree
+# current best results are positive setup/hold slack, clean slew, and 102 cap violations
 # included default settings in comments so we can see how far we are "twisting" the knobs
 
 DESIGN_REPAIR_MAX_SLEW_PCT: 30          # default: 20 %
 
-
 DESIGN_REPAIR_MAX_CAP_PCT: 60           # default: 20 %
 
-
 GRT_DESIGN_REPAIR_MAX_SLEW_PCT: 20      # default: 10 %
-
 
 GRT_DESIGN_REPAIR_MAX_CAP_PCT: 40       # default: 10 %
 
@@ -145,22 +141,25 @@ CTS_MAX_SLEW: 1.20                       # default: None; units: ns
 
 # Limits the number of sinks allowed in each CTS sink cluster
 # smaller clusters mean more leaf buffers and lower fanout/cap per
-# we had huge fanouts from clock tree leafs, up to 17. this fixed
-CTS_SINK_CLUSTERING_SIZE: 8               # default: None in LibreLane
+# originally we had huge fanouts from clock tree leafs, up to 17, this fixed it
+CTS_SINK_CLUSTERING_SIZE: 12               # default: None
 
 # Limits the physical diameter of each CTS sink cluster.
 # Smaller values keep sinks in a cluster physically closer together
 CTS_SINK_CLUSTERING_MAX_DIAMETER: 25      # default: None in LibreLane
 
-# buffer long nets during design repair
+CTS_CLK_MAX_WIRE_LENGTH: 450             # default: 0 best so far is 450 with 109 max cap violations spread between clk net and wires. 200 is only wire vios but thin hold/setup. unconstrained is mostly only clk net. 500 = 115 cap, mostly clk, good setup/hold
 
-DESIGN_REPAIR_MAX_WIRE_LENGTH: 250       # default: 0 um previous 300
+# buffer long nets during design repair
+DESIGN_REPAIR_MAX_WIRE_LENGTH: 250       # default: 0 um 
 
 # same but after global routing when wire estimates are more realistic
+GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200   # default: 0 µm
 
-GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200   # default: 0 um previous 250
+CTS_SINK_BUFFER_MAX_CAP_DERATE_PCT: 25  # default: None, smaller numbers means prefer larger buffers i think? so far 25 best w/102 cap vios & good slack
 
-MAX_FANOUT_CONSTRAINT: 8 # 8 has produced best results so far
+MAX_FANOUT_CONSTRAINT: 11 # 11 works well
+
 
 # Increase for more logic on your die
 PL_TARGET_DENSITY_PCT: 30
@@ -242,17 +241,6 @@ KLAYOUT_FILLER_OPTIONS:
 # Because we have multiple power pads for one power domain
 MAGIC_EXT_UNIQUE: notopports
 
-# # Make sure netgen doesn't create 'no_connect' nets
-# # Not needed since netgen 1.5.303
-# LVS_FLATTEN_CELLS:
-#     - gf180mcu_ws_ip__id
-#     - gf180mcu_ws_ip__logo
-
-# # gf180mcu_ws_ip__id/logo has no ports and components
-# # therefore make it an abstract cell in the layout
-# MAGIC_EXT_ABSTRACT_CELLS:
-#     - gf180mcu_ws_ip__id
-#     - gf180mcu_ws_ip__logo
 
 MACROS:
     gf180mcu_ws_ip__id:
