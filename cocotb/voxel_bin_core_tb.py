@@ -195,7 +195,7 @@ async def deposit_weights_and_thresholds(dut, weights, thresholds):
 
     for addr in range(2 * NUM_CLASSES):
         val = int(thresholds[addr])
-        upper19 = (val >> 19) & 0x7FFFF
+        upper19 = (val >> 18) & 0x7FFFF
         lower18 = val & 0x3FFFF
         await _send_raw_word(dut, build_thresh_upper_word(upper19))
         await _send_raw_word(dut, build_thresh_lower_word(lower18, addr))

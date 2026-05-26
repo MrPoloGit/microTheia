@@ -1,0 +1,109 @@
+====================================================
+ Running DUT=voxel_binning with CONFIG=voxel_default
+====================================================
+make[1]: Entering directory '/mnt/c/Users/jason/Documents/microTheia'
+mkdir -p cocotb/sim_build/voxel_binning
+/usr/local/bin/iverilog -o cocotb/sim_build/voxel_binning/sim.vvp -s voxel_binning -g2012 -Pvoxel_binning.GRID_SIZE=16 -Pvoxel_binning.NUM_BINS=8 -Pvoxel_binning.READOUT_BINS=8 -Pvoxel_binning.COUNTER_BITS=16 -f cocotb/sim_build/voxel_binning/cmds.f -s cocotb_iverilog_dump  src/chip_core.sv src/control_fsm.sv src/evt2_decoder.sv src/sram_wrapper.sv src/input_fifo.sv src/selectable_debug.sv src/spi_wrapper.sv src/soc.sv src/voxel_bin_core.sv src/voxel_binning.sv src/voxel_gesture_classifier.sv src/voxel_mac_engine.sv third_party/verilog_spi/spi_module.v third_party/verilog_spi/pos_edge_det.v third_party/verilog_spi/neg_edge_det.v  cocotb/sim_build/voxel_binning/cocotb_iverilog_dump.v
+rm -f results.xml
+COCOTB_TEST_MODULES=voxel_binning_tb COCOTB_TESTCASE= COCOTB_TEST_FILTER= COCOTB_TOPLEVEL=voxel_binning TOPLEVEL_LANG=verilog \
+         /usr/local/bin/vvp -M /home/jasonwaseq/.local/lib/python3.12/site-packages/cocotb/libs -m libcocotbvpi_icarus   cocotb/sim_build/voxel_binning/sim.vvp -fst  
+     -.--ns INFO     gpi                                ..mbed/gpi_embed.cpp:93   in _embed_init_python              Using Python 3.12.4 interpreter at /usr/bin/python3
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:79   in gpi_print_registered_impl       VPI registered
+     0.00ns INFO     cocotb                             Running on Icarus Verilog version 14.0 (devel)
+     0.00ns INFO     cocotb                             Seeding Python random module with 1779825637
+     0.00ns INFO     cocotb                             Initialized cocotb v2.0.1 from /home/jasonwaseq/.local/lib/python3.12/site-packages/cocotb
+     0.00ns INFO     cocotb.regression                  pytest not found, install it to enable better AssertionError messages
+     0.00ns INFO     cocotb                             Running tests
+     0.00ns INFO     cocotb.regression                  running voxel_binning_tb.test_reset_and_event_ready (1/15)
+[TEST START] test_reset_and_event_ready
+  4078.39ns WARNING  py.warnings                        /mnt/c/Users/jason/Documents/microTheia/cocotb/util/test_logging.py:42: DeprecationWarning: The 'units' argument has been renamed to 'unit'.
+                                                          sim_time_ns = float(get_sim_time(units="ns"))
+[TEST PASS] test_reset_and_event_ready @ 4078.386 ns
+  4078.39ns INFO     cocotb.regression                  voxel_binning_tb.test_reset_and_event_ready passed
+  4078.39ns INFO     cocotb.regression                  running voxel_binning_tb.test_known_events_then_readout (2/15)
+[TEST START] test_known_events_then_readout
+[TEST PASS] test_known_events_then_readout @ 72910.917 ns
+ 72910.92ns INFO     cocotb.regression                  voxel_binning_tb.test_known_events_then_readout passed
+ 72910.92ns INFO     cocotb.regression                  running voxel_binning_tb.test_timestamp_boundary_event_starts_next_bin (3/15)
+[TEST START] test_timestamp_boundary_event_starts_next_bin
+[TEST PASS] test_timestamp_boundary_event_starts_next_bin @ 141555.936 ns
+141555.94ns INFO     cocotb.regression                  voxel_binning_tb.test_timestamp_boundary_event_starts_next_bin passed
+141555.94ns INFO     cocotb.regression                  running voxel_binning_tb.test_timestamp_jump_rolls_multiple_bins (4/15)
+[TEST START] test_timestamp_jump_rolls_multiple_bins
+[TEST PASS] test_timestamp_jump_rolls_multiple_bins @ 462435.847 ns
+462435.85ns INFO     cocotb.regression                  voxel_binning_tb.test_timestamp_jump_rolls_multiple_bins passed
+462435.85ns INFO     cocotb.regression                  running voxel_binning_tb.test_wait_rd_backpressure (5/15)
+[TEST START] test_wait_rd_backpressure
+[TEST PASS] test_wait_rd_backpressure @ 531846.540 ns
+531846.54ns INFO     cocotb.regression                  voxel_binning_tb.test_wait_rd_backpressure passed
+531846.54ns INFO     cocotb.regression                  running voxel_binning_tb.test_counter_saturation (6/15)
+                                                            Counter must clamp at MAX_COUNTER without wrapping.
+[TEST START] test_counter_saturation
+[TEST PASS] test_counter_saturation @ 601460.371 ns
+601460.37ns INFO     cocotb.regression                  voxel_binning_tb.test_counter_saturation passed
+601460.37ns INFO     cocotb.regression                  running voxel_binning_tb.test_events_ignored_when_not_accum (7/15)
+[TEST START] test_events_ignored_when_not_accum
+[TEST PASS] test_events_ignored_when_not_accum @ 670074.138 ns
+670074.14ns INFO     cocotb.regression                  voxel_binning_tb.test_events_ignored_when_not_accum passed
+670074.14ns INFO     cocotb.regression                  running voxel_binning_tb.test_randomized_multibin_scoreboard (8/15)
+[TEST START] test_randomized_multibin_scoreboard
+[TEST PASS] test_randomized_multibin_scoreboard @ 818693.025 ns
+818693.03ns INFO     cocotb.regression                  voxel_binning_tb.test_randomized_multibin_scoreboard passed
+818693.03ns INFO     cocotb.regression                  running voxel_binning_tb.test_corner_coordinates_binned_correctly (9/15)
+                                                            Events at all four grid corners and centre are stored in the right cells.
+[TEST START] test_corner_coordinates_binned_correctly
+[TEST PASS] test_corner_coordinates_binned_correctly @ 887619.312 ns
+887619.31ns INFO     cocotb.regression                  voxel_binning_tb.test_corner_coordinates_binned_correctly passed
+887619.31ns INFO     cocotb.regression                  running voxel_binning_tb.test_clear_zeros_old_bin_data (10/15)
+                                                            After rotation, the newly cleared bin must read back as zero in the next window.
+[TEST START] test_clear_zeros_old_bin_data
+[TEST PASS] test_clear_zeros_old_bin_data @ 1246439.151 ns
+1246439.15ns INFO     cocotb.regression                  voxel_binning_tb.test_clear_zeros_old_bin_data passed
+1246439.15ns INFO     cocotb.regression                  running voxel_binning_tb.test_timestamp_driven_multibin_readout_matches_golden (11/15)
+                                                             Accumulate events in several bins via timestamp-boundary crossings only.
+[TEST START] test_timestamp_driven_multibin_readout_matches_golden
+[TEST PASS] test_timestamp_driven_multibin_readout_matches_golden @ 1315302.934 ns
+1315302.93ns INFO     cocotb.regression                  voxel_binning_tb.test_timestamp_driven_multibin_readout_matches_golden passed
+1315302.93ns INFO     cocotb.regression                  running voxel_binning_tb.test_high_event_rate_multi_bin_accuracy (12/15)
+                                                             Dense event stream across many bins; compare each readout against golden model.
+[TEST START] test_high_event_rate_multi_bin_accuracy
+[TEST PASS] test_high_event_rate_multi_bin_accuracy @ 1837664.489 ns
+1837664.49ns INFO     cocotb.regression                  voxel_binning_tb.test_high_event_rate_multi_bin_accuracy passed
+1837664.49ns INFO     cocotb.regression                  running voxel_binning_tb.test_event_ready_low_during_rmw_pending (13/15)
+                                                             event_ready must be 0 during the RMW writeback cycle and 1 the cycle after.
+[TEST START] test_event_ready_low_during_rmw_pending
+[TEST PASS] test_event_ready_low_during_rmw_pending @ 1841789.754 ns
+1841789.75ns INFO     cocotb.regression                  voxel_binning_tb.test_event_ready_low_during_rmw_pending passed
+1841789.75ns INFO     cocotb.regression                  running voxel_binning_tb.test_readout_start_single_cycle_pulse (14/15)
+                                                             readout_start must assert for exactly one clock cycle when readout begins.
+[TEST START] test_readout_start_single_cycle_pulse
+[TEST PASS] test_readout_start_single_cycle_pulse @ 1910403.521 ns
+1910403.52ns INFO     cocotb.regression                  voxel_binning_tb.test_readout_start_single_cycle_pulse passed
+1910403.52ns INFO     cocotb.regression                  running voxel_binning_tb.test_pending_event_on_force_rollover_cycle (15/15)
+                                                             An event presented simultaneously with force_rollover must be latched as pending
+[TEST START] test_pending_event_on_force_rollover_cycle
+[TEST PASS] test_pending_event_on_force_rollover_cycle @ 1979017.288 ns
+1979017.29ns INFO     cocotb.regression                  voxel_binning_tb.test_pending_event_on_force_rollover_cycle passed
+1979017.29ns INFO     cocotb.regression                  ********************************************************************************************************************************
+                                                         ** TEST                                                                    STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+                                                         ********************************************************************************************************************************
+                                                         ** voxel_binning_tb.test_reset_and_event_ready                              PASS        4078.39           0.05      74995.36  **
+                                                         ** voxel_binning_tb.test_known_events_then_readout                          PASS       68832.53           0.57     120055.50  **
+                                                         ** voxel_binning_tb.test_timestamp_boundary_event_starts_next_bin           PASS       68645.02           0.47     145560.79  **
+                                                         ** voxel_binning_tb.test_timestamp_jump_rolls_multiple_bins                 PASS      320879.91           2.29     140422.33  **
+                                                         ** voxel_binning_tb.test_wait_rd_backpressure                               PASS       69410.69           0.50     139737.04  **
+                                                         ** voxel_binning_tb.test_counter_saturation                                 PASS       69613.83           0.45     156205.78  **
+                                                         ** voxel_binning_tb.test_events_ignored_when_not_accum                      PASS       68613.77           0.45     152378.22  **
+                                                         ** voxel_binning_tb.test_randomized_multibin_scoreboard                     PASS      148618.89           1.07     138288.15  **
+                                                         ** voxel_binning_tb.test_corner_coordinates_binned_correctly                PASS       68926.29           0.44     157730.52  **
+                                                         ** voxel_binning_tb.test_clear_zeros_old_bin_data                           PASS      358819.84           2.50     143695.97  **
+                                                         ** voxel_binning_tb.test_timestamp_driven_multibin_readout_matches_golden   PASS       68863.78           0.49     141066.02  **
+                                                         ** voxel_binning_tb.test_high_event_rate_multi_bin_accuracy                 PASS      522361.55           3.49     149620.24  **
+                                                         ** voxel_binning_tb.test_event_ready_low_during_rmw_pending                 PASS        4125.26           0.02     179787.94  **
+                                                         ** voxel_binning_tb.test_readout_start_single_cycle_pulse                   PASS       68613.77           0.51     133626.63  **
+                                                         ** voxel_binning_tb.test_pending_event_on_force_rollover_cycle              PASS       68613.77           0.46     148173.79  **
+                                                         ********************************************************************************************************************************
+                                                         ** TESTS=15 PASS=15 FAIL=0 SKIP=0                                                    1979017.29          13.83     143075.15  **
+                                                         ********************************************************************************************************************************
+FST info: dumpfile cocotb/sim_build/voxel_binning/voxel_binning.fst opened for output.
+make[1]: Leaving directory '/mnt/c/Users/jason/Documents/microTheia'

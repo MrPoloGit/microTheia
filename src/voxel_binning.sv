@@ -55,7 +55,7 @@ module voxel_binning #(
     localparam int BIN_COUNT_BITS      = $clog2(NUM_BINS + 1);
     localparam int MEM_ADDR_BITS       = $clog2(TOTAL_CELLS > 1 ? TOTAL_CELLS : 2);
     //adding support for user programmable bin length, so removing theses parameters
-    localparam logic [33:0] DEFAULT_BIN_LENGTH = 34'd62500; // default is 125 ms bins aka 1 second window (8 bins in system)
+    localparam logic [33:0] DEFAULT_BIN_LENGTH = 34'd125000; // 125 ms bins -> 1 second window with READOUT_BINS=8
 
     // bin length simply comes in like weights or thresholds, when decoded is routed to this register
     logic [33:0] bin_duration_ts;
