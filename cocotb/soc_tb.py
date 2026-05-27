@@ -98,9 +98,9 @@ EXPECTED_BIN_FILE_CLASS = {0: 0, 1: 1, 2: 2, 3: 3}  # wave_{down,left,right,up}
 # These match evt2_decoder.sv.  Only opcodes the TB actually emits are listed;
 # CD_OFF/CD_ON/TIME_HIGH come straight from the recorded .bin files.
 
-EVT_WEIGHT      = 0x2  # [27:20]=weight, [19:9]=feature_addr, [8:7]=class_id
-EVT_THRESH_U    = 0x3  # [27:10]=upper 18 bits of threshold, [9:7]=addr
-EVT_THRESH_L    = 0x4  # [27:10]=lower 18 bits of threshold, [9:7]=addr
+EVT_WEIGHT      = 0x2  # [27:20]=weight, [19:8]=feature_addr (12b), [7:2]=class/sram sel (6b)
+EVT_THRESH_U    = 0x3  # [27:9]=upper 19-bit field of threshold (top bit unused at SCORE_BITS=36)
+EVT_THRESH_L    = 0x4  # [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
 EVT_BIN_LENGTH_U = 0x5  # [16:0]=upper 17 bits of bin_length_us
 EVT_BIN_LENGTH_L = 0x6  # [16:0]=lower 17 bits; latches bin_length_valid
 EVT_BOOT_REQ    = 0xC  # triggers control_fsm: ST_BOOT -> ST_LOAD
@@ -113,25 +113,28 @@ EVT_CD_OFF    = 0x0
 
 
 def build_evt2_weight(weight, feature_addr, class_id):
+    # Layout matches evt2_decoder.sv: data[27:20], feature addr[19:8] (12b), sram sel[7:2] (6b)
     return (
         ((EVT_WEIGHT & 0xF) << 28)
         | ((int(weight) & 0xFF) << 20)
-        | ((int(feature_addr) & 0x7FF) << 9)
-        | ((int(class_id) & 0x3) << 7)
+        | ((int(feature_addr) & 0xFFF) << 8)
+        | ((int(class_id) & 0x3F) << 2)
     )
 
 
 def build_evt2_thresh_upper(threshold_value, threshold_addr):
+    # THRESH_U: [27:9]=upper 19-bit field. The 36-bit threshold's bits [35:18] go
+    # into this field (top bit unused). RTL reads the thresh addr only from THRESH_L.
     threshold_value = int(threshold_value) & ((1 << 36) - 1)
-    upper = (threshold_value >> 18) & 0x3FFFF
+    upper = (threshold_value >> 18) & 0x7FFFF
     return (
         ((EVT_THRESH_U & 0xF) << 28)
-        | ((upper & 0x3FFFF) << 10)
-        | ((int(threshold_addr) & 0x7) << 7)
+        | ((upper & 0x7FFFF) << 9)
     )
 
 
 def build_evt2_thresh_lower(threshold_value, threshold_addr):
+    # THRESH_L: [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
     threshold_value = int(threshold_value) & ((1 << 36) - 1)
     lower = threshold_value & 0x3FFFF
     return (

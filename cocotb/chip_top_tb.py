@@ -522,12 +522,16 @@ _EXPECTED_CLASS = {0: 0, 1: 1, 2: 2, 3: 3}
 # ── EVT2 word builders ────────────────────────────────────────────────────────
 
 def _w_weight(weight, feat_addr, class_id):
-    return (0x2 << 28) | ((weight & 0xFF) << 20) | ((feat_addr & 0x7FF) << 9) | ((class_id & 0x3) << 7)
+    # EVT_WEIGHT = 0x2: [27:20]=data, [19:8]=feature addr (12b), [7:2]=class/sram sel (6b)
+    return (0x2 << 28) | ((weight & 0xFF) << 20) | ((feat_addr & 0xFFF) << 8) | ((class_id & 0x3F) << 2)
 
 def _w_thresh_upper(val, addr):
-    return (0x3 << 28) | (((val >> 18) & 0x3FFFF) << 10) | ((addr & 0x7) << 7)
+    # EVT_THRESH_U = 0x3: [27:9]=upper bits of threshold (19-bit field; top bit unused
+    # for SCORE_BITS=36). RTL reads addr only from THRESH_L, so addr is ignored here.
+    return (0x3 << 28) | (((val >> 18) & 0x7FFFF) << 9)
 
 def _w_thresh_lower(val, addr):
+    # EVT_THRESH_L = 0x4: [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
     return (0x4 << 28) | ((val & 0x3FFFF) << 10) | ((addr & 0x7) << 7)
 
 def _w_bin_length_upper(val):
