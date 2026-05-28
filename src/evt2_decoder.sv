@@ -52,7 +52,7 @@ module evt2_decoder #(
     localparam logic [3:0] EVT_THRESH_L   = 4'h4;
     localparam logic [3:0] BIN_LENGTH_U   = 4'h5;
     localparam logic [3:0] BIN_LENGTH_L   = 4'h6;
-
+    localparam logic [3:0] VOXEL_DIMS     = 4'h7;
     localparam logic [3:0] EVT_TIME_HIGH  = 4'h8;
 
     localparam logic [3:0] DEBUG_REQ      = 4'ha;
@@ -64,11 +64,6 @@ module evt2_decoder #(
 
     localparam int SENSOR_W_M1 = SENSOR_WIDTH  - 1;
     localparam int SENSOR_H_M1 = SENSOR_HEIGHT - 1;
-    localparam int X_BIN_DIV   = (SENSOR_WIDTH  / GRID_SIZE);
-    localparam int Y_BIN_DIV   = (SENSOR_HEIGHT / GRID_SIZE);
-    localparam int DIV_K       = 12;
-    localparam int X_M         = (1 << DIV_K) / X_BIN_DIV + 1;
-    localparam int Y_M         = (1 << DIV_K) / Y_BIN_DIV + 1;
 
     // Input decode
     wire [31:0] evt_word = SWAP_INPUT_BYTES
@@ -82,22 +77,27 @@ module evt2_decoder #(
 
     // Grid coordinate combinational logic
     logic [10:0]          x_clamped,   y_clamped;
-    logic [11+DIV_K:0]    x_prod_c,    y_prod_c;
-    logic [GRID_BITS:0]   x_grid_raw,  y_grid_raw;
     logic [GRID_BITS-1:0] x_grid,      y_grid;
+    logic [10:0]                      xbound_q [0:15];
+    logic [10:0]                      xbound_d [0:15];
+    logic [10:0]                      ybound_q [0:15];
+    logic [10:0]                      ybound_d [0:15];
 
     always_comb begin
         x_clamped  = (x_raw >= 11'(SENSOR_WIDTH))  ? SENSOR_W_M1[10:0] : x_raw;
         y_clamped  = (y_raw >= 11'(SENSOR_HEIGHT)) ? SENSOR_H_M1[10:0] : y_raw;
+        x_grid     = 4'd15;
+        y_grid     = 4'd15;
 
-        x_prod_c   = 24'(x_clamped * X_M);
-        y_prod_c   = 24'(y_clamped * Y_M);
+        for (int i = 0; i < 15; i++) begin
+            if (x_clamped <= xbound_q[i] && x_grid == 4'd15)
+                x_grid = i[3:0];
+        end
 
-        x_grid_raw = (GRID_BITS+1)'(x_prod_c >> DIV_K);
-        y_grid_raw = (GRID_BITS+1)'(y_prod_c >> DIV_K);
-
-        x_grid = (x_grid_raw >= (GRID_BITS+1)'(GRID_SIZE)) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(x_grid_raw);
-        y_grid = (y_grid_raw >= (GRID_BITS+1)'(GRID_SIZE)) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(y_grid_raw);
+        for (int j = 0; j < 15; j++) begin
+            if (y_clamped <= ybound_q[j] && y_grid == 4'd15)
+                y_grid = j[3:0];
+        end 
     end
 
     // Backpressure
@@ -152,6 +152,10 @@ module evt2_decoder #(
         bin_length_us_d      = bin_length_us_q;
         bin_length_valid_d   = 1'b0;
         bin_length_reg_d     = bin_length_reg_q;
+        for (int i = 0; i < 16; i++) begin
+            xbound_d[i] = xbound_q[i];
+            ybound_d[i] = ybound_q[i];
+        end
 
         if (data_valid && data_ready) begin
             case (pkt_type)
@@ -203,6 +207,13 @@ module evt2_decoder #(
                     if (evt_ld_en) begin
                         bin_length_us_d    = {bin_length_reg_q, evt_word[16:0]};
                         bin_length_valid_d = 1'b1;
+                    end
+                end
+
+                VOXEL_DIMS: begin
+                    if (evt_ld_en) begin
+                        xbound_d[evt_word[27:24]] = evt_word[23:13];
+                        ybound_d[evt_word[27:24]] = evt_word[12:2];
                     end
                 end
 
@@ -260,6 +271,10 @@ module evt2_decoder #(
             bin_length_us_q     <= '0;
             bin_length_valid_q  <= 1'b0;
             bin_length_reg_q    <= '0;
+            for (int i = 0; i < 16; i++) begin
+                xbound_q[i] <= (i * 20 + 19);
+                ybound_q[i] <= (i * 20 + 19);
+            end
         end else begin
             have_time_high_q    <= have_time_high_d;
             time_high_reg_q     <= time_high_reg_d;
@@ -283,6 +298,10 @@ module evt2_decoder #(
             bin_length_us_q     <= bin_length_us_d;
             bin_length_valid_q  <= bin_length_valid_d;
             bin_length_reg_q    <= bin_length_reg_d;
+            for (int i = 0; i < 16; i++) begin
+                xbound_q[i] <= xbound_d[i];
+                ybound_q[i] <= ybound_d[i];
+            end
         end
     end
 
