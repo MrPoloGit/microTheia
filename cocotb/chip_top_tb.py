@@ -493,26 +493,25 @@ import struct
 
 _REPO_ROOT    = Path(__file__).resolve().parents[1]
 _GRID_SIZE    = 16
-_READOUT_BINS = 8
+_READOUT_BINS = 16
 _NUM_CLASSES  = 4
-_FEAT_COUNT   = _GRID_SIZE * _GRID_SIZE * _READOUT_BINS   # 2048
+_FEAT_COUNT   = _GRID_SIZE * _GRID_SIZE * _READOUT_BINS   # 4096
 
 # Programmable bin length — added by commit c1146c3.
 #
-# voxel_binning.sv defaults bin_duration_ts to 34'd125000 (125 ms) on reset
-# and overrides it ONLY when the EVT2 decoder asserts bin_length_valid with a
-# non-zero bin_length_us.  evt2_decoder.sv accepts the value as two 17-bit
-# halves over BIN_LENGTH_U=0x5 / BIN_LENGTH_L=0x6 opcodes during evt_ld_en.
+# voxel_binning.sv defaults bin_duration_ts to 34'd62500 (62.5 ms) on reset
+# for the 16-bin chip (1 s window / 16 bins).  It is overridden whenever the
+# EVT2 decoder asserts bin_length_valid with a non-zero bin_length_us, via
+# the BIN_LENGTH_U=0x5 / BIN_LENGTH_L=0x6 opcodes during evt_ld_en.
 #
-# Why we now program it explicitly even when using the default:
-#   1. Exercises the new opcode path through SPI → FIFO → decoder → binning.
+# Why we program it explicitly even when matching the default:
+#   1. Exercises the BIN_LENGTH opcode path through SPI → FIFO → decoder → binning.
 #   2. Documents the bin length in the test instead of relying on an RTL
 #      default that could change.
-#   3. Makes the test resilient to future RTL refactors that might lower
-#      DEFAULT_BIN_LENGTH (would otherwise silently break flush-event spacing).
+#   3. Makes the test resilient to RTL refactors that might change DEFAULT_BIN_LENGTH.
 #
-# Override via env var:  BIN_LENGTH_US=50000  → 50 ms bins, 0.4 s window.
-BIN_LENGTH_US = int(os.getenv("BIN_LENGTH_US", "125000"))
+# Override via env var:  BIN_LENGTH_US=50000  → 50 ms bins, 0.8 s window.
+BIN_LENGTH_US = int(os.getenv("BIN_LENGTH_US", "62500"))
 
 GESTURE_NAMES = {0: "Down", 1: "Left", 2: "Right", 3: "Up"}
 
@@ -526,8 +525,9 @@ def _w_weight(weight, feat_addr, class_id):
     return (0x2 << 28) | ((weight & 0xFF) << 20) | ((feat_addr & 0xFFF) << 8) | ((class_id & 0x3F) << 2)
 
 def _w_thresh_upper(val, addr):
-    # EVT_THRESH_U = 0x3: [27:9]=upper bits of threshold (19-bit field; top bit unused
-    # for SCORE_BITS=36). RTL reads addr only from THRESH_L, so addr is ignored here.
+    # EVT_THRESH_U = 0x3: [27:9]=upper bits of threshold (19-bit field; fits
+    # exactly at SCORE_BITS=37, top bit unused at SCORE_BITS<37).
+    # RTL reads addr only from THRESH_L, so addr is ignored here.
     return (0x3 << 28) | (((val >> 18) & 0x7FFFF) << 9)
 
 def _w_thresh_lower(val, addr):
@@ -670,7 +670,7 @@ def _append_flush_events(words, bin_length_us=BIN_LENGTH_US):
     `bin_length_us`, which matches `bin_duration_ts` inside voxel_binning.
     The first event whose timestamp crosses the next bin boundary triggers a
     rollover (voxel_binning.sv:188 — `(acc_event_ts - bin_start_ts) >=
-    bin_duration_ts`), so READOUT_BINS+2=10 spaced events guarantee enough
+    bin_duration_ts`), so READOUT_BINS+2=18 spaced events guarantee enough
     rollovers to flush every bin in the ring buffer regardless of the
     programmed bin length.
 

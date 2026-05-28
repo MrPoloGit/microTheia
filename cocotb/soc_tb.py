@@ -59,7 +59,7 @@ CHIP_PERIOD_NS = CHIP_PERIOD_PS / 1000.0
 DATA_WIDTH = 32
 
 GRID_SIZE     = int(CFG.get("GRID_SIZE",     os.environ.get("GRID_SIZE",     16)))
-READOUT_BINS  = int(CFG.get("READOUT_BINS",  os.environ.get("READOUT_BINS",  8)))
+READOUT_BINS  = int(CFG.get("READOUT_BINS",  os.environ.get("READOUT_BINS",  16)))
 NUM_CLASSES   = int(CFG.get("NUM_CLASSES",   os.environ.get("NUM_CLASSES",   4)))
 WINDOW_MS     = int(CFG.get("WINDOW_MS",     os.environ.get("WINDOW_MS",     1000)))
 SENSOR_WIDTH  = int(CFG.get("SENSOR_WIDTH",  os.environ.get("SENSOR_WIDTH",  320)))
@@ -67,9 +67,10 @@ SENSOR_HEIGHT = int(CFG.get("SENSOR_HEIGHT", os.environ.get("SENSOR_HEIGHT", SEN
 
 FEATURE_COUNT = GRID_SIZE * GRID_SIZE * READOUT_BINS
 
-# Programmable bin length (µs).  voxel_binning.sv defaults to 125000 (125 ms)
-# on reset and overrides only when bin_length_valid pulses with a non-zero
-# value.  We program it explicitly for the same reasons chip_top_tb does:
+# Programmable bin length (µs).  voxel_binning.sv defaults to 62500 (62.5 ms)
+# on reset for the 16-bin chip (1 s window / 16 bins) and overrides only when
+# bin_length_valid pulses with a non-zero value.  We program it explicitly for
+# the same reasons chip_top_tb does:
 #   1. Exercises the new BIN_LENGTH opcode path (commit c1146c3).
 #   2. Documents bin length in the TB instead of relying on the RTL default.
 #   3. Keeps flush-event spacing in sync with the programmed value.
@@ -99,7 +100,7 @@ EXPECTED_BIN_FILE_CLASS = {0: 0, 1: 1, 2: 2, 3: 3}  # wave_{down,left,right,up}
 # CD_OFF/CD_ON/TIME_HIGH come straight from the recorded .bin files.
 
 EVT_WEIGHT      = 0x2  # [27:20]=weight, [19:8]=feature_addr (12b), [7:2]=class/sram sel (6b)
-EVT_THRESH_U    = 0x3  # [27:9]=upper 19-bit field of threshold (top bit unused at SCORE_BITS=36)
+EVT_THRESH_U    = 0x3  # [27:9]=upper 19-bit field of threshold (fits exactly at SCORE_BITS=37)
 EVT_THRESH_L    = 0x4  # [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
 EVT_BIN_LENGTH_U = 0x5  # [16:0]=upper 17 bits of bin_length_us
 EVT_BIN_LENGTH_L = 0x6  # [16:0]=lower 17 bits; latches bin_length_valid
@@ -123,9 +124,10 @@ def build_evt2_weight(weight, feature_addr, class_id):
 
 
 def build_evt2_thresh_upper(threshold_value, threshold_addr):
-    # THRESH_U: [27:9]=upper 19-bit field. The 36-bit threshold's bits [35:18] go
-    # into this field (top bit unused). RTL reads the thresh addr only from THRESH_L.
-    threshold_value = int(threshold_value) & ((1 << 36) - 1)
+    # THRESH_U: [27:9]=upper 19-bit field. For SCORE_BITS=37, bits [36:18] of
+    # the threshold go into this field (exact fit, no truncation). RTL reads
+    # the thresh addr only from THRESH_L.
+    threshold_value = int(threshold_value) & ((1 << 37) - 1)
     upper = (threshold_value >> 18) & 0x7FFFF
     return (
         ((EVT_THRESH_U & 0xF) << 28)
@@ -135,7 +137,7 @@ def build_evt2_thresh_upper(threshold_value, threshold_addr):
 
 def build_evt2_thresh_lower(threshold_value, threshold_addr):
     # THRESH_L: [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
-    threshold_value = int(threshold_value) & ((1 << 36) - 1)
+    threshold_value = int(threshold_value) & ((1 << 37) - 1)
     lower = threshold_value & 0x3FFFF
     return (
         ((EVT_THRESH_L & 0xF) << 28)

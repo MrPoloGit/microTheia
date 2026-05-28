@@ -4,12 +4,13 @@ Retrain quantized gesture weights from EVT2 .bin recordings.
 
 This script mirrors the cocotb timestamp-forced replay path:
 - EVT2 timestamp decode (time-high + ts_lsb)
-- 8-bin circular voxel windowing at WINDOW_MS/READOUT_BINS
+- circular voxel windowing at WINDOW_MS/READOUT_BINS
 - optional coordinate transforms (swap/flip) from config
 - oldest->newest feature packing (bin-major, then y, then x)
 
 It fits a non-negative linear multiclass model and exports:
-- weights/2048weights_q8_c0.mem ... c3.mem
+- weights/{FEATURE_COUNT}weights_q8_c0.mem ... c3.mem (e.g. 4096... for the
+  16-bin chip, 2048... for the 8-bin chip)
 - weights/thresholds.mem
 """
 
@@ -60,7 +61,7 @@ def read_config(path: Path) -> Config:
     return Config(
         window_ms=int(kv.get("WINDOW_MS", "1000").replace("_", "")),
         grid_size=int(kv.get("GRID_SIZE", "16").replace("_", "")),
-        readout_bins=int(kv.get("READOUT_BINS", "8").replace("_", "")),
+        readout_bins=int(kv.get("READOUT_BINS", "16").replace("_", "")),
         counter_bits=int(kv.get("COUNTER_BITS", "16").replace("_", "")),
         sensor_width=sensor_w,
         sensor_height=sensor_h,
@@ -194,25 +195,44 @@ def train_nonnegative_weights(
     return best[1]
 
 
-def pick_best_threshold(pos_scores: np.ndarray, neg_scores: np.ndarray) -> int:
+def pick_best_threshold(
+    pos_scores: np.ndarray,
+    neg_scores: np.ndarray,
+    pos_pct: float = 10.0,
+    neg_margin: float = 1.10,
+) -> int:
     """
-    Select threshold for rule score > threshold maximizing balanced accuracy.
+    Select a robust pass-threshold for the rule `score > threshold`.
+
+    Strategy: percentile-based on the positive distribution, clamped above the
+    negative median.  This is more tolerant of train/test distribution shift
+    than maximizing balanced accuracy:
+
+      • `pos_pct=10.0` puts the threshold at the 10th percentile of positive
+        scores, so ~90% of training positives pass.  Test positives (which
+        may have a lower mean than training) still mostly clear it.
+      • `neg_margin=1.10` enforces threshold >= 1.10 * median(neg) so we don't
+        slip below the typical negative — protects against false positives.
+      • Floor of `max(neg)/2` keeps the threshold non-trivial when the
+        positive distribution dips into zero (e.g. silent windows).
+
+    The previous balanced-accuracy picker overfit the threshold to the
+    training-set score distribution; on a held-out test set the threshold
+    was above the positives' max and gesture_valid never fired.
     """
     if len(pos_scores) == 0:
         return 0
-    candidates = sorted(
-        set([0] + [int(x) for x in pos_scores.tolist()] + [int(x) for x in neg_scores.tolist()])
-    )
-    best_t = 0
-    best_bal = -1.0
-    for t in candidates:
-        tpr = float(np.mean(pos_scores > t)) if len(pos_scores) else 0.0
-        tnr = float(np.mean(neg_scores <= t)) if len(neg_scores) else 1.0
-        bal = 0.5 * (tpr + tnr)
-        if bal > best_bal:
-            best_bal = bal
-            best_t = t
-    return int(best_t)
+
+    pos_p = float(np.percentile(pos_scores, pos_pct))
+    neg_floor = float(np.median(neg_scores) * neg_margin) if len(neg_scores) else 0.0
+    fallback = float(neg_scores.max() / 2) if len(neg_scores) else 0.0
+
+    t = max(0.0, min(pos_p, max(neg_floor, fallback)))
+    # If neg_floor pushed past the positive percentile (heavy class overlap),
+    # fall back to the percentile alone so we don't zero out all positives.
+    if t > pos_p:
+        t = pos_p
+    return int(t)
 
 
 def write_weight_mem(path: Path, values: np.ndarray) -> None:
@@ -221,8 +241,10 @@ def write_weight_mem(path: Path, values: np.ndarray) -> None:
 
 
 def write_thresholds(path: Path, class_thresh: list[int], diff_thresh: list[int]) -> None:
+    # SCORE_BITS is 37 for the 16-bin chip (16+8+clog2(4096)+1) and 36 for the
+    # 8-bin chip; 10 hex chars (40 bits) covers either without truncating.
     vals = list(class_thresh) + list(diff_thresh)
-    lines = [f"{int(v) & ((1 << 36) - 1):09X}" for v in vals]
+    lines = [f"{int(v) & ((1 << 37) - 1):010X}" for v in vals]
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
 
 
@@ -303,8 +325,9 @@ def main() -> None:
     diff_thresh = [0, 0, 0, 0]
 
     weights_dir = repo_root / "weights"
+    feat_count = cfg.readout_bins * cfg.grid_size * cfg.grid_size
     for c in range(4):
-        write_weight_mem(weights_dir / f"2048weights_q8_c{c}.mem", w_q[c])
+        write_weight_mem(weights_dir / f"{feat_count}weights_q8_c{c}.mem", w_q[c])
     write_thresholds(weights_dir / "thresholds.mem", class_thresh, diff_thresh)
 
     # Compact report for sanity.
@@ -321,6 +344,18 @@ def main() -> None:
         print(f"{name}: dominant={dom} expected={int(y[0])} ratio={ratio:.3f} hist={hist}")
     print(f"class_thresholds={class_thresh}")
     print("diff_thresholds=[0, 0, 0, 0]")
+
+    # Threshold pass rate report — checks that the chosen thresholds will
+    # actually fire gesture_valid on a reasonable fraction of training windows.
+    # A balanced-accuracy picker can produce thresholds that are above the
+    # positives' max (silent on test set); the percentile picker should give
+    # ~90% TPR by construction.
+    print("threshold pass rates (training set):")
+    for c in range(4):
+        pos = scores[y_all == c, c]
+        tpr = float((pos > class_thresh[c]).mean()) if len(pos) else 0.0
+        print(f"  class {c}: TPR={tpr*100:.1f}% (pos mean={int(pos.mean()) if len(pos) else 0}, "
+              f"pos max={int(pos.max()) if len(pos) else 0}, threshold={class_thresh[c]})")
 
 
 if __name__ == "__main__":
