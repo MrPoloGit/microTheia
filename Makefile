@@ -183,13 +183,34 @@ sim-chip-top: ## Run chip_top RTL simulation with cocotb
 	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
 .PHONY: sim-chip-top
 
-sim-gl: ## Run gate-level simulation with cocotb (Icarus; after copy-final)
-	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+# Stage-specific GLS netlists from the latest librelane run.
+GL_SYNTH_NETLIST := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/06-yosys-synthesis/chip_top.nl.v
+GL_FP_NETLIST    := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/13-openroad-floorplan/chip_top.pnl.v
+GL_PNR_NETLIST   := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/51-openroad-fillinsertion/chip_top.pnl.v
+
+sim-gl: ## Run post-synthesis gate-level simulation with cocotb (Icarus)
+	cd cocotb; GL=1 GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim-gl
 
-sim-gl-verilator: ## Run gate-level simulation with Verilator (faster than Icarus)
-	cd cocotb; LD_LIBRARY_PATH="" SIM=verilator GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+sim-gl-verilator: ## Run post-synthesis gate-level simulation with Verilator (faster than Icarus)
+	cd cocotb; LD_LIBRARY_PATH="" SIM=verilator GL=1 GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim-gl-verilator
+
+sim-gl-fp: ## Run post-floorplan gate-level simulation with cocotb (Icarus)
+	cd cocotb; GL=1 GL_NETLIST=$(GL_FP_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-gl-fp
+
+sim-gl-fp-verilator: ## Run post-floorplan gate-level simulation with Verilator
+	cd cocotb; LD_LIBRARY_PATH="" SIM=verilator GL=1 GL_NETLIST=$(GL_FP_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-gl-fp-verilator
+
+sim-gl-pnr: ## Run post-PnR gate-level simulation with cocotb (Icarus)
+	cd cocotb; GL=1 GL_NETLIST=$(GL_PNR_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-gl-pnr
+
+sim-gl-pnr-verilator: ## Run post-PnR gate-level simulation with Verilator
+	cd cocotb; LD_LIBRARY_PATH="" SIM=verilator GL=1 GL_NETLIST=$(GL_PNR_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-gl-pnr-verilator
 
 # Run the 4 gesture classifications in parallel, one process per core.
 # Each gets its own SIM_BUILD dir, log file, and results.xml.
@@ -222,7 +243,7 @@ sim-gl-parallel: ## Run all 4 gestures in parallel with Icarus (1 core per gestu
 	done
 .PHONY: sim-gl-parallel
 
-STA_RUN ?= RUN_2026-05-11_15-06-35
+STA_RUN ?= $(RUN_TAG)
 STA_CORNER ?= nom_tt_025C_3v30
 STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinsertion/chip_top.pnl.v
 # Raw OpenROAD-emitted SDF. Not consumed directly by Icarus — see comment on
