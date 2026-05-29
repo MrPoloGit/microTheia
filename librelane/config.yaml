@@ -157,11 +157,11 @@ GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200   # default: 0 µm
 
 CTS_SINK_BUFFER_MAX_CAP_DERATE_PCT: 25  # default: None, smaller numbers means prefer larger buffers i think? so far 25 best w/102 cap vios & good slack
 
-MAX_FANOUT_CONSTRAINT: 11 # 11 works well
+MAX_FANOUT_CONSTRAINT: 12 # 11 works well
 
 
 # Increase for more logic on your die
-PL_TARGET_DENSITY_PCT: 40 # 40 is best so far, 1.7 setup .315 hold 105 max cap and clean slew
+PL_TARGET_DENSITY_PCT: 35 # 40 is best so far, 1.7 setup .315 hold 105 max cap and clean slew
 GRT_ALLOW_CONGESTION: true
 
 # Fix antenna violations after DRT
@@ -423,42 +423,42 @@ MACROS:
 
              # expansion weights srams
             "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[2].gen_byte[0].genblk1.sel.u_sram":
-                location: [750, 610]
+                location: [750, 685]
                 orientation: W
             "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[3].gen_byte[0].genblk1.sel.u_sram":
-                location: [750, 1010]
+                location: [750, 1085]
                 orientation: W
             "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[2].gen_byte[0].genblk1.sel.u_sram":
-                location: [1395, 610]
+                location: [1395, 685]
                 orientation: E
             "i_chip_core.u_soc.u_core.gen_weight_ram[1].u_weight_ram.gen_bank[3].gen_byte[0].genblk1.sel.u_sram":
-                location: [1395, 1010]
+                location: [1395, 1085]
                 orientation: E
             "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[2].gen_byte[0].genblk1.sel.u_sram":
-                location: [2010, 610]
+                location: [2010, 685]
                 orientation: W
             "i_chip_core.u_soc.u_core.gen_weight_ram[2].u_weight_ram.gen_bank[3].gen_byte[0].genblk1.sel.u_sram":
-                location: [2010, 1010]
+                location: [2010, 1085]
                 orientation: W
             "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[2].gen_byte[0].genblk1.sel.u_sram":
-                location: [2655, 610]
+                location: [2655, 685]
                 orientation: E
             "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[3].gen_byte[0].genblk1.sel.u_sram":
-                location: [2655, 1010]
+                location: [2655, 1085]
                 orientation: E
 
-            # expansion feature srams
+            # expansion feature srams added 75 vertically
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[2].gen_byte[0].genblk1.sel.u_sram":
-                location: [800, 3265]
+                location: [800, 3350]
                 orientation: S
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[2].gen_byte[1].genblk1.sel.u_sram":
-                location: [800, 3900]
+                location: [800, 3975]
                 orientation: N
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[3].gen_byte[0].genblk1.sel.u_sram":
-                location: [1200, 3265]
+                location: [1200, 3350]
                 orientation: S
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[3].gen_byte[1].genblk1.sel.u_sram":
-                location: [1200, 3900]
+                location: [1200, 3975]
                 orientation: N
 
             # expansion counter srams
