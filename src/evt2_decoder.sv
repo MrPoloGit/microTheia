@@ -97,7 +97,7 @@ module evt2_decoder #(
         for (int j = 0; j < 15; j++) begin
             if (y_clamped <= ybound_q[j] && y_grid == 4'd15)
                 y_grid = j[3:0];
-        end 
+        end
     end
 
     // Backpressure
