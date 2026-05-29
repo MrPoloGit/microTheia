@@ -655,7 +655,7 @@ async def test_custom_voxel_binning(dut):
     lower = 0
 
     for expected_bin, upper in enumerate(expected_bounds):
-        test_pixel = (lower + upper) // 2
+        test_pixel = (lower + upper) // 2  # removed -8
         word = make_cd_word(x=test_pixel, y=test_pixel)
 
         await send_word(dut, word)
