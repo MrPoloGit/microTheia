@@ -161,7 +161,7 @@ MAX_FANOUT_CONSTRAINT: 12 # 11 works well
 
 
 # Increase for more logic on your die
-PL_TARGET_DENSITY_PCT: 35 # 40 is best so far, 1.7 setup .315 hold 105 max cap and clean slew
+PL_TARGET_DENSITY_PCT: 35 # 35 best so far for ver 2.0
 GRT_ALLOW_CONGESTION: true
 
 # Fix antenna violations after DRT
@@ -291,13 +291,7 @@ MACROS:
             # "*_ss_125C_3v00":
             #     - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram256x8m8wm1__ss_125C_3v00.lib
         instances:
-            # input_fifo: 1 bank × 4 byte-lanes
-            # c2×2 block
-            # the 256x8 macro is about 301µm wide × 130µm tall in N/S orientation.
-            # x pitch is 400µm so is aprox 99µm horizontal space between
-            # y pitch is 300µm so about 170µm vertical space between rows
-
-            # moved input fifo cluster down by 115 µm to make room above
+            #expanded input fifo srams (only placement is changed from our standard configuration)
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[0].sel.u_sram":
                 location: [800, 3015]
                 orientation: N
@@ -310,10 +304,7 @@ MACROS:
             "i_chip_core.u_soc.u_core.u_input_fifo.u_fifo_mem.gen_bank[0].gen_byte[3].sel.u_sram":
                 location: [1200, 2715]
                 orientation: S
-            # thresh_ram: 1 bank × 5 byte-lanes
-            # W/E that im using rotates the 256x8 macro so the footprint is roughly 130µm × 301µm
-            # x pitch is 400µm giving plenty of horizontal room (expanded because was too dense)
-            # y pitch is 400µm, giving about 99µm vertical clearance between the two rows.
+            #standard threshold srams (same in expanded configuration)
             "i_chip_core.u_soc.u_core.u_thresh_ram.gen_bank[0].gen_byte[0].sel.u_sram":
                 location: [2400, 2200]
                 orientation: W
@@ -360,10 +351,7 @@ MACROS:
             # "*_ss_125C_3v00":
             #     - pdk_dir::libs.ref/gf180mcu_ocd_ip_sram/lib/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__ss_125C_3v00.lib
         instances:
-            # sram1024x8 is about 301µm wide × 535µm tall from the LEF pin extents.
-            #  top row is y=2040 with N orientation, bottom row is y=1500 with S orientation.
-            # x pitch 400µm soabout 99µm horizontal space
-            # y pitch 545µm so about 10µm between
+            # standard weight srams
             "i_chip_core.u_soc.u_core.gen_weight_ram[0].u_weight_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
                 location: [800, 2145]
                 orientation: N
@@ -388,10 +376,7 @@ MACROS:
             "i_chip_core.u_soc.u_core.gen_weight_ram[3].u_weight_ram.gen_bank[1].gen_byte[0].genblk1.sel.u_sram":
                 location: [2000, 1500]
                 orientation: S
-            # feature_ram 4 tiles arranged as a 2×2 block
-            # top row is y=3400 with N orientation, bottom row is y=2860 with S orientation.
-            # x pitch 400µm so about 99µm horizontal spacing.
-            # y pitch 545µm (barely clears, works)
+            # standard feature srams
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
                 location: [1600, 3405]
                 orientation: N
@@ -404,10 +389,7 @@ MACROS:
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[1].gen_byte[1].genblk1.sel.u_sram":
                 location: [2000, 2760]
                 orientation: S
-            # counter_mem 4 tiles arranged as a 2×2 block next to feature_ram
-            # y=3400 for N and y=2860 for S.
-            # x locations are 1600 and 2000, lines up with the feature_ram block
-            # 400µm horizontal pitch and 545µm vertical pitch.
+            # standard counter srams
             "i_chip_core.u_soc.u_core.u_voxel_binning.u_counter_mem.gen_bank[0].gen_byte[0].genblk1.sel.u_sram":
                 location: [2400, 3405]
                 orientation: N
@@ -447,7 +429,7 @@ MACROS:
                 location: [2655, 1085]
                 orientation: E
 
-            # expansion feature srams added 75 vertically
+            # expansion feature srams 
             "i_chip_core.u_soc.u_core.u_feature_ram.gen_bank[2].gen_byte[0].genblk1.sel.u_sram":
                 location: [800, 3350]
                 orientation: S
