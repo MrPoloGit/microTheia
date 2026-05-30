@@ -775,7 +775,7 @@ async def test_soc_debug_page_sweep(dut):
     dut._log.info("PASS: debug pages 0-4 selected without simulation error")
 
 
-async def _classify_one_recording(dut, bin_path, drain_cycles=50_000):
+async def _classify_one_recording(dut, bin_path, drain_cycles=300_000):
     """
     Stream one recording, collect every gesture_valid pulse, drain the
     pipeline, and return the GestureMonitor with all observations.
@@ -786,11 +786,13 @@ async def _classify_one_recording(dut, bin_path, drain_cycles=50_000):
     await stream_bin_recording_over_spi(dut, bin_path)
     await log_pipeline_state(dut, "post-stream")
 
-    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms.  Easily covers
-    #   * voxel_binning final readout + clear (~8 * 513 = 4104 cycles)
-    #   * MAC engine (~2049)
-    #   * 4-stage classifier pipeline
-    # so every gesture_valid pulse this recording will produce has fired.
+    # Drain: 300 000 cycles @ 64 MHz = 4.7 ms. After streaming we have
+    # READOUT_BINS+1 = 17 flush-driven bin rollovers queued in the binner;
+    # the classifier emits one gesture_valid pulse per rollover at ~128 µs
+    # throughput (16-bin readout + MAC + classifier pipeline). 50 000 cycles
+    # captured only the first ~6 pulses, biasing the dominant class toward
+    # the noisy opening windows. 300 000 cycles covers all ~17 expected
+    # pulses with margin so the dominant reflects the full recording.
     dut._log.info(f"Draining pipeline for {drain_cycles} cycles ...")
     await ClockCycles(dut.clk, drain_cycles)
     await log_pipeline_state(dut, "post-drain")

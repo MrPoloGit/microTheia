@@ -1083,20 +1083,24 @@ async def _stream_recording(dut, pins, bin_path):
     await _spi_stream(dut, pins, words, inter_gap=4,
                       progress_every=10_000, tag=stem)
 
-    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
-    #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
-    #   • MAC engine settling (~2049)
-    #   • classifier 4-stage pipeline
-    dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
+    # Drain: 300 000 cycles @ 64 MHz = 4.7 ms. After streaming we have
+    # ~READOUT_BINS+2 = 18 flush-driven bin rollovers queued in the binner.
+    # The classifier emits one gesture_valid pulse per rollover at ~128 µs
+    # throughput (16 bins × 513 readout cycles + 4-class MAC + 4-stage
+    # classifier pipeline). 18 pulses × 128 µs ≈ 2.3 ms — 50 000 cycles only
+    # captured the first 6, biasing the dominant class toward the noisy
+    # opening windows. 300 000 cycles covers all ~18 expected pulses plus
+    # margin.
+    dut._log.info("Recording consumed; draining pipeline (300 000 cycles) …")
 
     if use_pin_level_monitor:
         await _sample_miso_during_drain(
             dut, pins, result,
-            num_samples=50,
+            num_samples=300,
             gap_cycles=1000,
         )
     else:
-        await ClockCycles(dut.clk_PAD, 50_000)
+        await ClockCycles(dut.clk_PAD, 300_000)
         monitor_task.cancel()
 
     if not result.gestures:
