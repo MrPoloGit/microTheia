@@ -12,7 +12,7 @@ from util.config_parser import load_config
 MODULE = os.environ.get("TOPLEVEL")
 CFG = load_config(MODULE)
 
-FEATURE_COUNT = CFG.get("FEATURE_COUNT", 2048)
+FEATURE_COUNT = CFG.get("FEATURE_COUNT", 4096)
 COUNTER_BITS  = CFG.get("COUNTER_BITS",  16)
 WEIGHT_BITS   = CFG.get("WEIGHT_BITS",   8)
 NUM_CLASSES   = CFG.get("NUM_CLASSES",   4)

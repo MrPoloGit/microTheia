@@ -59,7 +59,7 @@ CHIP_PERIOD_NS = CHIP_PERIOD_PS / 1000.0
 DATA_WIDTH = 32
 
 GRID_SIZE     = int(CFG.get("GRID_SIZE",     os.environ.get("GRID_SIZE",     16)))
-READOUT_BINS  = int(CFG.get("READOUT_BINS",  os.environ.get("READOUT_BINS",  8)))
+READOUT_BINS  = int(CFG.get("READOUT_BINS",  os.environ.get("READOUT_BINS",  16)))
 NUM_CLASSES   = int(CFG.get("NUM_CLASSES",   os.environ.get("NUM_CLASSES",   4)))
 WINDOW_MS     = int(CFG.get("WINDOW_MS",     os.environ.get("WINDOW_MS",     1000)))
 SENSOR_WIDTH  = int(CFG.get("SENSOR_WIDTH",  os.environ.get("SENSOR_WIDTH",  320)))
@@ -67,9 +67,10 @@ SENSOR_HEIGHT = int(CFG.get("SENSOR_HEIGHT", os.environ.get("SENSOR_HEIGHT", SEN
 
 FEATURE_COUNT = GRID_SIZE * GRID_SIZE * READOUT_BINS
 
-# Programmable bin length (µs).  voxel_binning.sv defaults to 125000 (125 ms)
-# on reset and overrides only when bin_length_valid pulses with a non-zero
-# value.  We program it explicitly for the same reasons chip_top_tb does:
+# Programmable bin length (µs).  voxel_binning.sv defaults to 62500 (62.5 ms)
+# on reset for the 16-bin chip (1 s window / 16 bins) and overrides only when
+# bin_length_valid pulses with a non-zero value.  We program it explicitly for
+# the same reasons chip_top_tb does:
 #   1. Exercises the new BIN_LENGTH opcode path (commit c1146c3).
 #   2. Documents bin length in the TB instead of relying on the RTL default.
 #   3. Keeps flush-event spacing in sync with the programmed value.
@@ -98,9 +99,9 @@ EXPECTED_BIN_FILE_CLASS = {0: 0, 1: 1, 2: 2, 3: 3}  # wave_{down,left,right,up}
 # These match evt2_decoder.sv.  Only opcodes the TB actually emits are listed;
 # CD_OFF/CD_ON/TIME_HIGH come straight from the recorded .bin files.
 
-EVT_WEIGHT      = 0x2  # [27:20]=weight, [19:9]=feature_addr, [8:7]=class_id
-EVT_THRESH_U    = 0x3  # [27:10]=upper 18 bits of threshold, [9:7]=addr
-EVT_THRESH_L    = 0x4  # [27:10]=lower 18 bits of threshold, [9:7]=addr
+EVT_WEIGHT      = 0x2  # [27:20]=weight, [19:8]=feature_addr (12b), [7:2]=class/sram sel (6b)
+EVT_THRESH_U    = 0x3  # [27:9]=upper 19-bit field of threshold (fits exactly at SCORE_BITS=37)
+EVT_THRESH_L    = 0x4  # [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
 EVT_BIN_LENGTH_U = 0x5  # [16:0]=upper 17 bits of bin_length_us
 EVT_BIN_LENGTH_L = 0x6  # [16:0]=lower 17 bits; latches bin_length_valid
 EVT_BOOT_REQ    = 0xC  # triggers control_fsm: ST_BOOT -> ST_LOAD
@@ -113,26 +114,30 @@ EVT_CD_OFF    = 0x0
 
 
 def build_evt2_weight(weight, feature_addr, class_id):
+    # Layout matches evt2_decoder.sv: data[27:20], feature addr[19:8] (12b), sram sel[7:2] (6b)
     return (
         ((EVT_WEIGHT & 0xF) << 28)
         | ((int(weight) & 0xFF) << 20)
-        | ((int(feature_addr) & 0x7FF) << 9)
-        | ((int(class_id) & 0x3) << 7)
+        | ((int(feature_addr) & 0xFFF) << 8)
+        | ((int(class_id) & 0x3F) << 2)
     )
 
 
 def build_evt2_thresh_upper(threshold_value, threshold_addr):
-    threshold_value = int(threshold_value) & ((1 << 36) - 1)
-    upper = (threshold_value >> 18) & 0x3FFFF
+    # THRESH_U: [27:9]=upper 19-bit field. For SCORE_BITS=37, bits [36:18] of
+    # the threshold go into this field (exact fit, no truncation). RTL reads
+    # the thresh addr only from THRESH_L.
+    threshold_value = int(threshold_value) & ((1 << 37) - 1)
+    upper = (threshold_value >> 18) & 0x7FFFF
     return (
         ((EVT_THRESH_U & 0xF) << 28)
-        | ((upper & 0x3FFFF) << 10)
-        | ((int(threshold_addr) & 0x7) << 7)
+        | ((upper & 0x7FFFF) << 9)
     )
 
 
 def build_evt2_thresh_lower(threshold_value, threshold_addr):
-    threshold_value = int(threshold_value) & ((1 << 36) - 1)
+    # THRESH_L: [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
+    threshold_value = int(threshold_value) & ((1 << 37) - 1)
     lower = threshold_value & 0x3FFFF
     return (
         ((EVT_THRESH_L & 0xF) << 28)
@@ -770,7 +775,7 @@ async def test_soc_debug_page_sweep(dut):
     dut._log.info("PASS: debug pages 0-4 selected without simulation error")
 
 
-async def _classify_one_recording(dut, bin_path, drain_cycles=50_000):
+async def _classify_one_recording(dut, bin_path, drain_cycles=300_000):
     """
     Stream one recording, collect every gesture_valid pulse, drain the
     pipeline, and return the GestureMonitor with all observations.
@@ -781,11 +786,13 @@ async def _classify_one_recording(dut, bin_path, drain_cycles=50_000):
     await stream_bin_recording_over_spi(dut, bin_path)
     await log_pipeline_state(dut, "post-stream")
 
-    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms.  Easily covers
-    #   * voxel_binning final readout + clear (~8 * 513 = 4104 cycles)
-    #   * MAC engine (~2049)
-    #   * 4-stage classifier pipeline
-    # so every gesture_valid pulse this recording will produce has fired.
+    # Drain: 300 000 cycles @ 64 MHz = 4.7 ms. After streaming we have
+    # READOUT_BINS+1 = 17 flush-driven bin rollovers queued in the binner;
+    # the classifier emits one gesture_valid pulse per rollover at ~128 µs
+    # throughput (16-bin readout + MAC + classifier pipeline). 50 000 cycles
+    # captured only the first ~6 pulses, biasing the dominant class toward
+    # the noisy opening windows. 300 000 cycles covers all ~17 expected
+    # pulses with margin so the dominant reflects the full recording.
     dut._log.info(f"Draining pipeline for {drain_cycles} cycles ...")
     await ClockCycles(dut.clk, drain_cycles)
     await log_pipeline_state(dut, "post-drain")

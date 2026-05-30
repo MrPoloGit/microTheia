@@ -78,7 +78,7 @@ def main() -> None:
     repo_root = args.repo_root.resolve()
     cfg = load_kv_config((repo_root / args.config).resolve())
     grid = parse_int(cfg, "GRID_SIZE", 16)
-    bins = parse_int(cfg, "READOUT_BINS", 8)
+    bins = parse_int(cfg, "READOUT_BINS", 16)
     num_classes = parse_int(cfg, "NUM_CLASSES", 4)
     feat_count = grid * grid * bins
 
@@ -87,9 +87,6 @@ def main() -> None:
 
     for c in range(num_classes):
         mem_path = repo_root / "weights" / f"{feat_count}weights_q8_c{c}.mem"
-        if not mem_path.exists():
-            # Fall back to standard naming used by this project.
-            mem_path = repo_root / "weights" / f"2048weights_q8_c{c}.mem"
         w = load_mem(mem_path, feat_count).reshape(bins, grid, grid)
 
         rows = int(np.ceil(bins / 4))

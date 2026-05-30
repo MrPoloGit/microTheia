@@ -41,6 +41,7 @@ final/
 img/
 *.lyrdb
 results.xml
+macro_instances.txt
 
 # Parallel GLS run artifacts (one set per gesture)
 logs/
@@ -51,4 +52,6 @@ project/
 src/rtl/
 target/
 
+# cocotb
 cocotb/*.sdf
+cocotb/*.txt

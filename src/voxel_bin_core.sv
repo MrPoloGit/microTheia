@@ -12,8 +12,8 @@ module voxel_bin_core #(
     parameter int CLK_FREQ_HZ       = 64_000_000,
     parameter int WINDOW_MS         = 1000,
     parameter int GRID_SIZE         = 16,
-    parameter int NUM_BINS          = 8,
-    parameter int READOUT_BINS      = 8,
+    parameter int NUM_BINS          = 16,
+    parameter int READOUT_BINS      = 16,
     parameter int COUNTER_BITS      = 16,
     parameter int FIFO_DEPTH        = 256,
     parameter int DATA_WIDTH        = 32,
@@ -69,17 +69,17 @@ module voxel_bin_core #(
     logic debug_req_o;
 
     //EVT2Decoder Wires
-    logic                           evt_reads_done;
-    logic [WEIGHT_BITS-1:0]         dec_weight_data_o;
-    logic [10:0]                    dec_weight_addr_o;
-    logic [1:0]                     dec_weight_sram_addr_o;
-    logic                           dec_weight_event_valid;
-    logic [SCORE_BITS-1:0]          dec_thresh_data_o;
-    logic [2:0]                     dec_thresh_addr_o;
-    logic [2:0]                     dec_thresh_5xaddr_o;
-    logic                           dec_thresh_event_valid;
-    logic [33:0]                    bin_length_us; //for programmable bin length
-    logic                           bin_length_valid;
+    logic                             evt_reads_done;
+    logic [WEIGHT_BITS-1:0]           dec_weight_data_o;
+    logic [$clog2(FEATURE_COUNT)-1:0] dec_weight_addr_o;
+    logic [5:0]                       dec_weight_sram_addr_o;
+    logic                             dec_weight_event_valid;
+    logic [SCORE_BITS-1:0]            dec_thresh_data_o;
+    logic [2:0]                       dec_thresh_addr_o;
+    logic [2:0]                       dec_thresh_5xaddr_o;
+    logic                             dec_thresh_event_valid;
+    logic [33:0]                      bin_length_us; //for programmable bin length
+    logic                             bin_length_valid;
     assign dec_thresh_5xaddr_o = dec_thresh_addr_o;
 
 
@@ -268,6 +268,7 @@ module voxel_bin_core #(
     evt2_decoder #(
         .SENSOR_WIDTH     (SENSOR_WIDTH),
         .SENSOR_HEIGHT    (SENSOR_HEIGHT),
+        .FEATURE_COUNT    (FEATURE_COUNT),
         .GRID_SIZE        (GRID_SIZE),
         .SCORE_BITS       (SCORE_BITS),
         .WEIGHT_BITS      (WEIGHT_BITS),
@@ -371,7 +372,7 @@ module voxel_bin_core #(
 `endif
                 .clk_i      (clk),
                 .reset_i    (rst),
-                .wr_valid_i (weight_wr_valid_gated && (dec_weight_sram_addr_o == 2'(g))),
+                .wr_valid_i (weight_wr_valid_gated && (dec_weight_sram_addr_o == 6'(g))),
                 .wr_data_i  (dec_weight_data_o),
                 .wr_addr_i  (dec_weight_addr_o),
                 .rd_valid_i (weight_rd_valid),

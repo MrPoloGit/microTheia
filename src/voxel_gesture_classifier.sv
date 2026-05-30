@@ -4,7 +4,7 @@
 
 module voxel_gesture_classifier #(
     parameter int NUM_CLASSES = 4,
-    parameter int SCORE_BITS  = 36
+    parameter int SCORE_BITS  = 37
 )(
     input  logic                              clk,
     input  logic                              rst,

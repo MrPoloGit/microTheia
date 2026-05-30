@@ -8,43 +8,43 @@
 module evt2_decoder #(
     parameter int SENSOR_WIDTH      = 320,
     parameter int SENSOR_HEIGHT     = 320,
+    parameter int FEATURE_COUNT     = 4096,
     parameter int GRID_SIZE         = 16,
-    parameter int SCORE_BITS        = 36,
+    parameter int SCORE_BITS        = 37,
     parameter int WEIGHT_BITS       = 8,
     parameter bit REQUIRE_TIME_HIGH = 1'b1,
     parameter bit SWAP_INPUT_BYTES  = 1'b0
 )(
-    input  logic                         clk,
-    input  logic                         rst,
-    input  logic [31:0]                  data_in,
-    input  logic                         data_valid,
-    input  logic                         event_ready_i,
-    input  logic                         evt_ld_en,
-    output logic                         data_ready,
-    output logic [$clog2(GRID_SIZE)-1:0] x_out,
-    output logic [$clog2(GRID_SIZE)-1:0] y_out,
-    output logic                         event_valid,
-    output logic                         evt_reads_done,
-    output logic [10:0]                  weight_addr_o,
-    output logic [WEIGHT_BITS-1:0]       weight_data_o,
-    output logic [1:0]                   weight_sram_addr_o,
-    output logic                         weight_event_valid,
-    output logic [SCORE_BITS-1:0]        thresh_data_o,
-    output logic [2:0]                   thresh_addr_o,
-    output logic                         thresh_event_valid,
-    output logic [33:0]                  ts_out,
-    output logic [33:0]                  bin_length_us,
-    output logic                         bin_length_valid,
-    output logic                         debug_req_o,
-    output logic                         reload_req_o,
-    output logic                         boot_req_o,
-    output logic [11:0]                  decoder_dbg,
-    output logic [31:0]                  decoder_output_dbg,
-    output logic [3:0]                   debug_page_sel
+    input  logic                             clk,
+    input  logic                             rst,
+    input  logic [31:0]                      data_in,
+    input  logic                             data_valid,
+    input  logic                             event_ready_i,
+    input  logic                             evt_ld_en,
+    output logic                             data_ready,
+    output logic [$clog2(GRID_SIZE)-1:0]     x_out,
+    output logic [$clog2(GRID_SIZE)-1:0]     y_out,
+    output logic                             event_valid,
+    output logic                             evt_reads_done,
+    output logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_o,
+    output logic [WEIGHT_BITS-1:0]           weight_data_o,
+    output logic [5:0]                       weight_sram_addr_o,
+    output logic                             weight_event_valid,
+    output logic [SCORE_BITS-1:0]            thresh_data_o,
+    output logic [2:0]                       thresh_addr_o,
+    output logic                             thresh_event_valid,
+    output logic [33:0]                      ts_out,
+    output logic [33:0]                      bin_length_us,
+    output logic                             bin_length_valid,
+    output logic                             debug_req_o,
+    output logic                             reload_req_o,
+    output logic                             boot_req_o,
+    output logic [11:0]                      decoder_dbg,
+    output logic [31:0]                      decoder_output_dbg,
+    output logic [3:0]                       debug_page_sel
 );
 
     localparam int GRID_BITS  = $clog2(GRID_SIZE);
-
     localparam logic [3:0] EVT_CD_OFF     = 4'h0;
     localparam logic [3:0] EVT_CD_ON      = 4'h1;
     localparam logic [3:0] EVT_WEIGHT     = 4'h2;
@@ -52,20 +52,18 @@ module evt2_decoder #(
     localparam logic [3:0] EVT_THRESH_L   = 4'h4;
     localparam logic [3:0] BIN_LENGTH_U   = 4'h5;
     localparam logic [3:0] BIN_LENGTH_L   = 4'h6;
+    localparam logic [3:0] VOXEL_DIMS     = 4'h7;
     localparam logic [3:0] EVT_TIME_HIGH  = 4'h8;
+
     localparam logic [3:0] DEBUG_REQ      = 4'ha;
     localparam logic [3:0] RELOAD_REQ     = 4'hb;
     localparam logic [3:0] BOOT_REQ       = 4'hc;
+
     localparam logic [3:0] DEBUG_PAGE     = 4'he;
     localparam logic [3:0] EVT_READS_DONE = 4'hf;
 
     localparam int SENSOR_W_M1 = SENSOR_WIDTH  - 1;
     localparam int SENSOR_H_M1 = SENSOR_HEIGHT - 1;
-    localparam int X_BIN_DIV   = (SENSOR_WIDTH  / GRID_SIZE);
-    localparam int Y_BIN_DIV   = (SENSOR_HEIGHT / GRID_SIZE);
-    localparam int DIV_K       = 12;
-    localparam int X_M         = (1 << DIV_K) / X_BIN_DIV + 1;
-    localparam int Y_M         = (1 << DIV_K) / Y_BIN_DIV + 1;
 
     // Input decode
     wire [31:0] evt_word = SWAP_INPUT_BYTES
@@ -79,50 +77,55 @@ module evt2_decoder #(
 
     // Grid coordinate combinational logic
     logic [10:0]          x_clamped,   y_clamped;
-    logic [11+DIV_K:0]    x_prod_c,    y_prod_c;
-    logic [GRID_BITS:0]   x_grid_raw,  y_grid_raw;
     logic [GRID_BITS-1:0] x_grid,      y_grid;
+    logic [10:0]                      xbound_q [0:15];
+    logic [10:0]                      xbound_d [0:15];
+    logic [10:0]                      ybound_q [0:15];
+    logic [10:0]                      ybound_d [0:15];
 
     always_comb begin
         x_clamped  = (x_raw >= 11'(SENSOR_WIDTH))  ? SENSOR_W_M1[10:0] : x_raw;
         y_clamped  = (y_raw >= 11'(SENSOR_HEIGHT)) ? SENSOR_H_M1[10:0] : y_raw;
+        x_grid     = 4'd15;
+        y_grid     = 4'd15;
 
-        x_prod_c   = 24'(x_clamped * X_M);
-        y_prod_c   = 24'(y_clamped * Y_M);
+        for (int i = 0; i < 15; i++) begin
+            if (x_clamped <= xbound_q[i] && x_grid == 4'd15)
+                x_grid = i[3:0];
+        end
 
-        x_grid_raw = (GRID_BITS+1)'(x_prod_c >> DIV_K);
-        y_grid_raw = (GRID_BITS+1)'(y_prod_c >> DIV_K);
-
-        x_grid = (x_grid_raw >= (GRID_BITS+1)'(GRID_SIZE)) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(x_grid_raw);
-        y_grid = (y_grid_raw >= (GRID_BITS+1)'(GRID_SIZE)) ? GRID_BITS'(GRID_SIZE-1) : GRID_BITS'(y_grid_raw);
+        for (int j = 0; j < 15; j++) begin
+            if (y_clamped <= ybound_q[j] && y_grid == 4'd15)
+                y_grid = j[3:0];
+        end
     end
 
     // Backpressure
     assign data_ready = (!is_cd) || event_ready_i;
 
     // State registers (_q) and next-state signals (_d)
-    logic                  have_time_high_q,      have_time_high_d;
-    logic [27:0]           time_high_reg_q,       time_high_reg_d;
-    logic [GRID_BITS-1:0]  x_out_q,               x_out_d;
-    logic [GRID_BITS-1:0]  y_out_q,               y_out_d;
-    logic [33:0]           ts_out_q,              ts_out_d;
-    logic                  event_valid_q,          event_valid_d;
-    logic                  weight_event_valid_q,   weight_event_valid_d;
-    logic                  thresh_event_valid_q,   thresh_event_valid_d;
-    logic                  evt_reads_done_q,       evt_reads_done_d;
-    logic [17:0]           thresh_reg_q,           thresh_reg_d;
-    logic [10:0]           weight_addr_q,          weight_addr_d;
-    logic [WEIGHT_BITS-1:0] weight_data_q,         weight_data_d;
-    logic [1:0]            weight_sram_addr_q,     weight_sram_addr_d;
-    logic [SCORE_BITS-1:0] thresh_data_q,          thresh_data_d;
-    logic [2:0]            thresh_addr_q,          thresh_addr_d;
-    logic [3:0]            debug_page_sel_q,       debug_page_sel_d;
-    logic                  boot_req_q,             boot_req_d;
-    logic                  reload_req_q,           reload_req_d;
-    logic                  debug_req_q,            debug_req_d;
-    logic [33:0]           bin_length_us_q,        bin_length_us_d;
-    logic                  bin_length_valid_q,     bin_length_valid_d;
-    logic [16:0]           bin_length_reg_q,       bin_length_reg_d;
+    logic                             have_time_high_q,       have_time_high_d;
+    logic [27:0]                      time_high_reg_q,        time_high_reg_d;
+    logic [GRID_BITS-1:0]             x_out_q,                x_out_d;
+    logic [GRID_BITS-1:0]             y_out_q,                y_out_d;
+    logic [33:0]                      ts_out_q,               ts_out_d;
+    logic                             event_valid_q,          event_valid_d;
+    logic                             weight_event_valid_q,   weight_event_valid_d;
+    logic                             thresh_event_valid_q,   thresh_event_valid_d;
+    logic                             evt_reads_done_q,       evt_reads_done_d;
+    logic [18:0]                      thresh_reg_q,           thresh_reg_d;
+    logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_q,          weight_addr_d;
+    logic [WEIGHT_BITS-1:0]           weight_data_q,          weight_data_d;
+    logic [5:0]                       weight_sram_addr_q,     weight_sram_addr_d;
+    logic [SCORE_BITS-1:0]            thresh_data_q,          thresh_data_d;
+    logic [2:0]                       thresh_addr_q,          thresh_addr_d;
+    logic [3:0]                       debug_page_sel_q,       debug_page_sel_d;
+    logic                             boot_req_q,             boot_req_d;
+    logic                             reload_req_q,           reload_req_d;
+    logic                             debug_req_q,            debug_req_d;
+    logic [33:0]                      bin_length_us_q,        bin_length_us_d;
+    logic                             bin_length_valid_q,     bin_length_valid_d;
+    logic [16:0]                      bin_length_reg_q,       bin_length_reg_d;
 
     // Next-state combinational block
     always_comb begin
@@ -149,6 +152,10 @@ module evt2_decoder #(
         bin_length_us_d      = bin_length_us_q;
         bin_length_valid_d   = 1'b0;
         bin_length_reg_d     = bin_length_reg_q;
+        for (int i = 0; i < 16; i++) begin
+            xbound_d[i] = xbound_q[i];
+            ybound_d[i] = ybound_q[i];
+        end
 
         if (data_valid && data_ready) begin
             case (pkt_type)
@@ -169,16 +176,16 @@ module evt2_decoder #(
 
                 EVT_WEIGHT: begin
                     if (evt_ld_en) begin
-                        weight_data_d      = evt_word[27:20];
-                        weight_addr_d      = evt_word[19:9];
-                        weight_sram_addr_d = evt_word[8:7];
+                        weight_data_d        = evt_word[27:20];
+                        weight_addr_d        = evt_word[19:8];
+                        weight_sram_addr_d   = evt_word[7:2];
                         weight_event_valid_d = 1'b1;
                     end
                 end
 
                 EVT_THRESH_U: begin
                     if (evt_ld_en) begin
-                        thresh_reg_d = evt_word[27:10];
+                        thresh_reg_d = evt_word[27:9];
                     end
                 end
 
@@ -200,6 +207,13 @@ module evt2_decoder #(
                     if (evt_ld_en) begin
                         bin_length_us_d    = {bin_length_reg_q, evt_word[16:0]};
                         bin_length_valid_d = 1'b1;
+                    end
+                end
+
+                VOXEL_DIMS: begin
+                    if (evt_ld_en) begin
+                        xbound_d[evt_word[27:24]] = evt_word[23:13];
+                        ybound_d[evt_word[27:24]] = evt_word[12:2];
                     end
                 end
 
@@ -257,6 +271,10 @@ module evt2_decoder #(
             bin_length_us_q     <= '0;
             bin_length_valid_q  <= 1'b0;
             bin_length_reg_q    <= '0;
+            for (int i = 0; i < 16; i++) begin
+                xbound_q[i] <= (i * 20 + 19);
+                ybound_q[i] <= (i * 20 + 19);
+            end
         end else begin
             have_time_high_q    <= have_time_high_d;
             time_high_reg_q     <= time_high_reg_d;
@@ -280,6 +298,10 @@ module evt2_decoder #(
             bin_length_us_q     <= bin_length_us_d;
             bin_length_valid_q  <= bin_length_valid_d;
             bin_length_reg_q    <= bin_length_reg_d;
+            for (int i = 0; i < 16; i++) begin
+                xbound_q[i] <= xbound_d[i];
+                ybound_q[i] <= ybound_d[i];
+            end
         end
     end
 

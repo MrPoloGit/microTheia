@@ -33,16 +33,18 @@ async def setup(dut):
     dut.SCLK.value = 0
     dut.CS.value = 1
     dut.MOSI.value = 0
-    dut.reset.value = 1
+    dut.rst.value = 1
 
     dut.gesture.value = 0
     dut.gesture_valid.value = 0
     dut.gesture_confidence.value = 0
 
+    dut.evt_word_ready_i.value = 1
+
     await ClockCycles(dut.clk, 8)
     await NextTimeStep()
 
-    dut.reset.value = 0
+    dut.rst.value = 0
 
     await ClockCycles(dut.clk, 20)
 
@@ -268,9 +270,9 @@ async def wait_for_evt_word(dut, expected_word=None, max_cycles=1000):
         await RisingEdge(dut.clk)
         await ReadOnly()
 
-        if int(dut.evt_valid.value):
+        if int(dut.evt_word_valid.value):
             val = dut.evt_word.value
-            dut._log.info(f"evt_valid=1 cycle={cycle}, evt_word={val}")
+            dut._log.info(f"evt_word_valid=1 cycle={cycle}, evt_word={val}")
 
             if val.is_resolvable:
                 observed = int(val)
@@ -278,7 +280,7 @@ async def wait_for_evt_word(dut, expected_word=None, max_cycles=1000):
 
         await NextTimeStep()
 
-    assert observed is not None, "Did not observe evt_valid"
+    assert observed is not None, "Did not observe evt_word_valid"
 
     if expected_word is not None:
         assert observed == expected_word, (
@@ -299,10 +301,10 @@ async def wait_for_evt_words(dut, expected_words, max_cycles_per_word=1000):
             await RisingEdge(dut.clk)
             await ReadOnly()
 
-            if int(dut.evt_valid.value):
+            if int(dut.evt_word_valid.value):
                 val = dut.evt_word.value
                 dut._log.info(
-                    f"evt_valid=1 word_idx={word_idx} cycle={cycle}, evt_word={val}"
+                    f"evt_word_valid=1 word_idx={word_idx} cycle={cycle}, evt_word={val}"
                 )
 
                 if val.is_resolvable:
@@ -311,7 +313,7 @@ async def wait_for_evt_words(dut, expected_words, max_cycles_per_word=1000):
 
             await NextTimeStep()
 
-        assert observed is not None, f"Did not observe evt_valid for word_idx={word_idx}"
+        assert observed is not None, f"Did not observe evt_word_valid for word_idx={word_idx}"
 
         assert observed == expected_word, (
             f"evt_word mismatch word_idx={word_idx}: "
@@ -328,8 +330,8 @@ async def assert_no_evt_valid(dut, cycles, tag):
         await RisingEdge(dut.clk)
         await ReadOnly()
 
-        assert int(dut.evt_valid.value) == 0, (
-            f"{tag}: evt_valid unexpectedly asserted at cycle {cycle}"
+        assert int(dut.evt_word_valid.value) == 0, (
+            f"{tag}: evt_word_valid unexpectedly asserted at cycle {cycle}"
         )
 
         await NextTimeStep()

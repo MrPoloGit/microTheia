@@ -1,21 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Group G Contributors
-import random
-
-import cocotb
-from util.test_logging import logged_test
-from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, NextTimeStep, ReadOnly, RisingEdge
 import math
 import os
+import random
+
+from cocotb.clock import Clock
+from cocotb.triggers import ClockCycles, NextTimeStep, ReadOnly, RisingEdge
 from util.config_parser import load_config
+from util.test_logging import logged_test
+
+import cocotb
 
 MODULE = os.environ.get("TOPLEVEL")
 CFG = load_config(MODULE)
 
-GRID_SIZE     = CFG["GRID_SIZE"]
-SENSOR_WIDTH  = CFG["SENSOR_WIDTH"]
+GRID_SIZE = CFG["GRID_SIZE"]
+SENSOR_WIDTH = CFG["SENSOR_WIDTH"]
 SENSOR_HEIGHT = CFG["SENSOR_HEIGHT"]
+FEATURE_COUNT = CFG["FEATURE_COUNT"]
 MAP_SWAP_XY = CFG.get("MAP_SWAP_XY", 0)
 MAP_FLIP_X = CFG.get("MAP_FLIP_X", 0)
 MAP_FLIP_Y = CFG.get("MAP_FLIP_Y", 0)
@@ -25,13 +27,29 @@ REQUIRE_TIME_HIGH = 1
 EVT_CD_OFF = 0x0
 EVT_CD_ON = 0x1
 EVT_TIME_HIGH = 0x8
+VOXEL_DIMS = 0x7
+
 
 def build_evt2_cd(pkt_type, x, y, ts_lsb):
-    return ((pkt_type & 0xF) << 28) | ((ts_lsb & 0x3F) << 22) | ((x & 0x7FF) << 11) | (y & 0x7FF)
+    return (
+        ((pkt_type & 0xF) << 28)
+        | ((ts_lsb & 0x3F) << 22)
+        | ((x & 0x7FF) << 11)
+        | (y & 0x7FF)
+    )
 
 
 def build_evt2_time_high(payload):
     return (EVT_TIME_HIGH << 28) | (payload & 0x0FFFFFFF)
+
+
+def make_voxel_dims_word(bin_idx, x_bound, y_bound):
+    return (
+        ((VOXEL_DIMS & 0xF) << 28)
+        | ((bin_idx & 0xF) << 24)
+        | ((x_bound & 0x7FF) << 13)
+        | ((y_bound & 0x7FF) << 2)
+    )
 
 
 class Evt2DecoderModel:
@@ -89,7 +107,9 @@ class Evt2DecoderModel:
 
 
 async def setup(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     dut.rst.value = 1
     dut.data_in.value = 0
     dut.data_valid.value = 0
@@ -110,14 +130,18 @@ async def drive_and_check(dut, model, rst, data_in, data_valid, event_ready_i, t
     await RisingEdge(dut.clk)
     await ReadOnly()
 
-    assert int(dut.data_ready.value) == exp_data_ready, \
+    assert int(dut.data_ready.value) == exp_data_ready, (
         f"{tag}: data_ready DUT={int(dut.data_ready.value)} model={exp_data_ready}"
-    assert int(dut.x_out.value) == model.x_out, \
+    )
+    assert int(dut.x_out.value) == model.x_out, (
         f"{tag}: x_out DUT={int(dut.x_out.value)} model={model.x_out}"
-    assert int(dut.y_out.value) == model.y_out, \
+    )
+    assert int(dut.y_out.value) == model.y_out, (
         f"{tag}: y_out DUT={int(dut.y_out.value)} model={model.y_out}"
-    assert int(dut.event_valid.value) == model.event_valid, \
+    )
+    assert int(dut.event_valid.value) == model.event_valid, (
         f"{tag}: event_valid DUT={int(dut.event_valid.value)} model={model.event_valid}"
+    )
 
     await NextTimeStep()
 
@@ -188,10 +212,12 @@ async def test_coordinate_clamp_and_timestamp(dut):
     await drive_and_check(dut, model, 0, word, 1, 1, "clamp")
 
     exp_x, exp_y = model._grid_map(0x7FF, 0x7FF)
-    assert int(dut.x_out.value) == exp_x, \
+    assert int(dut.x_out.value) == exp_x, (
         f"clamp x_out mismatch: got {int(dut.x_out.value)} exp {exp_x}"
-    assert int(dut.y_out.value) == exp_y, \
+    )
+    assert int(dut.y_out.value) == exp_y, (
         f"clamp y_out mismatch: got {int(dut.y_out.value)} exp {exp_y}"
+    )
 
 
 @logged_test()
@@ -209,7 +235,12 @@ async def test_randomized_golden_scoreboard(dut):
     for cycle in range(1800):
         pkt_type = rng.choice([0x0, 0x1, 0x2, 0x5, 0x8, 0xF])
         if pkt_type in (EVT_CD_OFF, EVT_CD_ON):
-            word = build_evt2_cd(pkt_type, rng.randint(0, 0x7FF), rng.randint(0, 0x7FF), rng.randint(0, 63))
+            word = build_evt2_cd(
+                pkt_type,
+                rng.randint(0, 0x7FF),
+                rng.randint(0, 0x7FF),
+                rng.randint(0, 63),
+            )
         elif pkt_type == EVT_TIME_HIGH:
             word = build_evt2_time_high(rng.randint(0, 0x0FFFFFFF))
         else:
@@ -242,10 +273,12 @@ async def test_grid_coordinate_lower_boundaries(dut):
         exp_x, exp_y = model._grid_map(x_sensor, 0)
         got_x = int(dut.x_out.value)
         got_y = int(dut.y_out.value)
-        assert got_x == exp_x, \
+        assert got_x == exp_x, (
             f"x_sensor={x_sensor} should map to x={exp_x}, got {got_x}"
-        assert got_y == exp_y, \
+        )
+        assert got_y == exp_y, (
             f"x_sensor={x_sensor} should map to y={exp_y}, got {got_y}"
+        )
 
 
 @logged_test()
@@ -264,8 +297,9 @@ async def test_unknown_packet_types_no_event(dut):
     for pkt_type in [0x5, 0x6, 0x7]:
         word = (pkt_type << 28) | 0x00ABCDEF
         await drive_and_check(dut, model, 0, word, 1, 1, f"unk-0x{pkt_type:X}")
-        assert int(dut.event_valid.value) == 0, \
+        assert int(dut.event_valid.value) == 0, (
             f"Packet type 0x{pkt_type:X} should not emit event_valid"
+        )
 
 
 @logged_test()
@@ -296,10 +330,12 @@ async def test_consecutive_cd_events_all_valid(dut):
         await drive_and_check(dut, model, 0, word, 1, 1, f"cd-{i}")
         assert int(dut.event_valid.value) == 1, f"No event_valid for CD event {i}"
         exp_x, exp_y = model._grid_map(x_sensor, y_sensor)
-        assert int(dut.x_out.value) == exp_x, \
+        assert int(dut.x_out.value) == exp_x, (
             f"x_out mismatch at event {i}: got {int(dut.x_out.value)} exp {exp_x}"
-        assert int(dut.y_out.value) == exp_y, \
+        )
+        assert int(dut.y_out.value) == exp_y, (
             f"y_out mismatch at event {i}: got {int(dut.y_out.value)} exp {exp_y}"
+        )
 
 
 @logged_test()
@@ -328,8 +364,9 @@ async def test_reset_clears_time_high_requirement(dut):
 
     # Without a new TIME_HIGH, a CD event should be suppressed.
     await drive_and_check(dut, model, 0, cd, 1, 1, "cd-no-th")
-    assert int(dut.event_valid.value) == 0, \
+    assert int(dut.event_valid.value) == 0, (
         "event_valid should be suppressed when no TIME_HIGH since reset"
+    )
 
     # After a fresh TIME_HIGH it should work again.
     await drive_and_check(dut, model, 0, build_evt2_time_high(0x66), 1, 1, "th2")
@@ -363,8 +400,7 @@ async def test_grid_coordinate_upper_boundaries(dut):
         got = int(dut.x_out.value)
         exp = model._grid_map(x_upper, 0)[0]
 
-        assert got == exp, \
-            f"x_sensor={x_upper} mapped to {got}, expected {exp}"
+        assert got == exp, f"x_sensor={x_upper} mapped to {got}, expected {exp}"
 
         # First pixel of next cell
         x_next = (g + 1) * step
@@ -376,10 +412,13 @@ async def test_grid_coordinate_upper_boundaries(dut):
         got_next = int(dut.x_out.value)
         exp_next = model._grid_map(x_next, 0)[0]
 
-        assert got_next == exp_next, \
+        assert got_next == exp_next, (
             f"x_sensor={x_next} mapped to {got_next}, expected {exp_next}"
+        )
+
 
 """New Tests"""
+
 
 def make_word(pkt, payload=0):
     return (pkt << 28) | payload
@@ -405,16 +444,18 @@ async def send_word(dut, word):
 
 @logged_test()
 async def test_weight_packet(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.evt_ld_en.value = 1
 
     weight = 0xAB
-    addr   = 0x7F2
-    sram   = 0x2
+    addr = 0x001
+    sram = 0x00
 
-    payload = (weight << 20) | (addr << 9) | (sram << 7)
+    payload = (weight << 20) | (addr << 8) | (sram << 2)
     word = make_word(0x2, payload)
 
     await send_word(dut, word)
@@ -428,7 +469,9 @@ async def test_weight_packet(dut):
 
 @logged_test()
 async def test_weight_requires_ld_en(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.evt_ld_en.value = 0
@@ -441,23 +484,33 @@ async def test_weight_requires_ld_en(dut):
 
 @logged_test()
 async def test_threshold_upper_lower(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.evt_ld_en.value = 1
 
-    upper = 0x2AAAA
-    lower = 0x15555
-    addr  = 0x3
+    upper = 0x7AAAA
+    lower = 0x35555
+    addr = 0x3
 
-    upper_payload = upper << 10
+    upper_payload = upper << 9
     lower_payload = (lower << 10) | (addr << 7)
 
     await send_word(dut, make_word(0x3, upper_payload))  # U
     await send_word(dut, make_word(0x4, lower_payload))  # L
 
     expected = (upper << 18) | lower
-
+    print(bin(expected))
+    print(bin(upper_payload))
+    print(dut.thresh_data_o.value)
+    print(f"upper      = {upper:019b}")
+    print(f"payload    = {upper_payload:028b}")
+    print(f"evt_word   = {make_word(0x3, upper_payload):032b}")
+    print("thresh_data_o width:", len(dut.thresh_data_o))
+    print("thresh_data_o int   :", int(dut.thresh_data_o.value))
+    print("thresh_data_o bin   :", format(int(dut.thresh_data_o.value), "037b"))
     assert dut.thresh_event_valid.value == 1
     assert dut.event_valid.value == 0
     assert dut.thresh_data_o.value == expected
@@ -466,7 +519,9 @@ async def test_threshold_upper_lower(dut):
 
 @logged_test()
 async def test_threshold_requires_ld_en(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     dut.evt_ld_en.value = 0
@@ -479,7 +534,9 @@ async def test_threshold_requires_ld_en(dut):
 
 @logged_test()
 async def test_reads_done_pulse(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     await send_word(dut, make_word(0xF, 0))
@@ -492,7 +549,9 @@ async def test_reads_done_pulse(dut):
 
 @logged_test()
 async def test_debug_page(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     page = 0xA
@@ -502,9 +561,12 @@ async def test_debug_page(dut):
 
     assert dut.debug_page_sel.value == page
 
+
 @logged_test()
 async def test_boot_req_pulse(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     # send BOOT_REQ packet (assuming type 0xB — adjust if different)
@@ -515,9 +577,12 @@ async def test_boot_req_pulse(dut):
     await RisingEdge(dut.clk)
     assert dut.boot_req_o.value == 0
 
+
 @logged_test()
 async def test_reload_req_pulse(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     # send RELOAD_REQ packet (assuming type 0xC — adjust if different)
@@ -528,9 +593,12 @@ async def test_reload_req_pulse(dut):
     await RisingEdge(dut.clk)
     assert dut.reload_req_o.value == 0
 
+
 @logged_test()
 async def test_debug_req_pulse(dut):
-    cocotb.start_soon(Clock(dut.clk, 15626, "ps").start())  # ~64 MHz chip clock (system default; even ps required by cocotb)
+    cocotb.start_soon(
+        Clock(dut.clk, 15626, "ps").start()
+    )  # ~64 MHz chip clock (system default; even ps required by cocotb)
     await reset_dut(dut)
 
     # send DEBUG_REQ packet (assuming type 0xD — adjust if different)
@@ -540,3 +608,78 @@ async def test_debug_req_pulse(dut):
 
     await RisingEdge(dut.clk)
     assert dut.debug_req_o.value == 0
+
+
+def make_cd_word(x, y, ts_lsb=0, pkt=EVT_CD_OFF):
+    return (
+        (pkt & 0xF) << 28 | ((ts_lsb & 0x3F) << 22) | ((x & 0x7FF) << 11) | (y & 0x7FF)
+    )
+
+
+@logged_test()
+async def test_custom_voxel_binning(dut):
+
+    cocotb.start_soon(
+        Clock(dut.clk, 15.624, units="ns").start()
+    )  # cocotb.start_soon(Clock(dut.clk, 15625, units="ps").start())
+    await reset_dut(dut)
+    expected_bounds = []
+    dut.evt_ld_en.value = 1
+    running_upper = -1
+
+    for i in range(16):
+        width = 12 if (i % 2 == 0) else 28
+        running_upper += width
+        expected_bounds.append(running_upper)
+
+    dut._log.info(f"Expected bounds: {expected_bounds}")
+    for i, bound in enumerate(expected_bounds):
+        word = make_voxel_dims_word(bin_idx=i, x_bound=bound, y_bound=bound)
+
+        await send_word(dut, word)
+
+    for i, expected in enumerate(expected_bounds):
+        actual_x = int(dut.xbound_q[i].value)
+        actual_y = int(dut.ybound_q[i].value)
+
+        assert actual_x == expected, (
+            f"xbound[{i}] incorrect. Expected {expected}, got {actual_x}"
+        )
+
+        assert actual_y == expected, (
+            f"ybound[{i}] incorrect. Expected {expected}, got {actual_y}"
+        )
+
+    dut._log.info("Boundary programming verified")
+    await send_word(dut, build_evt2_time_high(0))
+    lower = 0
+
+    for expected_bin, upper in enumerate(expected_bounds):
+        test_pixel = (lower + upper) // 2  # removed -8
+        word = make_cd_word(x=test_pixel, y=test_pixel)
+
+        await send_word(dut, word)
+        assert int(dut.event_valid.value) == 1, (
+            f"event_valid not asserted for bin {expected_bin}"
+        )
+
+        actual_x_bin = int(dut.x_out.value)
+        actual_y_bin = int(dut.y_out.value)
+
+        assert actual_x_bin == expected_bin, (
+            f"X bin mismatch for pixel {test_pixel}. "
+            f"Expected {expected_bin}, got {actual_x_bin}"
+        )
+
+        assert actual_y_bin == expected_bin, (
+            f"Y bin mismatch for pixel {test_pixel}. "
+            f"Expected {expected_bin}, got {actual_y_bin}"
+        )
+
+        dut._log.info(
+            f"Pixel {test_pixel} -> x_bin={actual_x_bin}, y_bin={actual_y_bin}"
+        )
+
+        lower = upper + 1
+
+    dut._log.info("Custom voxel binning test PASSED")

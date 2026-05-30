@@ -493,26 +493,25 @@ import struct
 
 _REPO_ROOT    = Path(__file__).resolve().parents[1]
 _GRID_SIZE    = 16
-_READOUT_BINS = 8
+_READOUT_BINS = 16
 _NUM_CLASSES  = 4
-_FEAT_COUNT   = _GRID_SIZE * _GRID_SIZE * _READOUT_BINS   # 2048
+_FEAT_COUNT   = _GRID_SIZE * _GRID_SIZE * _READOUT_BINS   # 4096
 
 # Programmable bin length — added by commit c1146c3.
 #
-# voxel_binning.sv defaults bin_duration_ts to 34'd125000 (125 ms) on reset
-# and overrides it ONLY when the EVT2 decoder asserts bin_length_valid with a
-# non-zero bin_length_us.  evt2_decoder.sv accepts the value as two 17-bit
-# halves over BIN_LENGTH_U=0x5 / BIN_LENGTH_L=0x6 opcodes during evt_ld_en.
+# voxel_binning.sv defaults bin_duration_ts to 34'd62500 (62.5 ms) on reset
+# for the 16-bin chip (1 s window / 16 bins).  It is overridden whenever the
+# EVT2 decoder asserts bin_length_valid with a non-zero bin_length_us, via
+# the BIN_LENGTH_U=0x5 / BIN_LENGTH_L=0x6 opcodes during evt_ld_en.
 #
-# Why we now program it explicitly even when using the default:
-#   1. Exercises the new opcode path through SPI → FIFO → decoder → binning.
+# Why we program it explicitly even when matching the default:
+#   1. Exercises the BIN_LENGTH opcode path through SPI → FIFO → decoder → binning.
 #   2. Documents the bin length in the test instead of relying on an RTL
 #      default that could change.
-#   3. Makes the test resilient to future RTL refactors that might lower
-#      DEFAULT_BIN_LENGTH (would otherwise silently break flush-event spacing).
+#   3. Makes the test resilient to RTL refactors that might change DEFAULT_BIN_LENGTH.
 #
-# Override via env var:  BIN_LENGTH_US=50000  → 50 ms bins, 0.4 s window.
-BIN_LENGTH_US = int(os.getenv("BIN_LENGTH_US", "125000"))
+# Override via env var:  BIN_LENGTH_US=50000  → 50 ms bins, 0.8 s window.
+BIN_LENGTH_US = int(os.getenv("BIN_LENGTH_US", "62500"))
 
 GESTURE_NAMES = {0: "Down", 1: "Left", 2: "Right", 3: "Up"}
 
@@ -522,12 +521,17 @@ _EXPECTED_CLASS = {0: 0, 1: 1, 2: 2, 3: 3}
 # ── EVT2 word builders ────────────────────────────────────────────────────────
 
 def _w_weight(weight, feat_addr, class_id):
-    return (0x2 << 28) | ((weight & 0xFF) << 20) | ((feat_addr & 0x7FF) << 9) | ((class_id & 0x3) << 7)
+    # EVT_WEIGHT = 0x2: [27:20]=data, [19:8]=feature addr (12b), [7:2]=class/sram sel (6b)
+    return (0x2 << 28) | ((weight & 0xFF) << 20) | ((feat_addr & 0xFFF) << 8) | ((class_id & 0x3F) << 2)
 
 def _w_thresh_upper(val, addr):
-    return (0x3 << 28) | (((val >> 18) & 0x3FFFF) << 10) | ((addr & 0x7) << 7)
+    # EVT_THRESH_U = 0x3: [27:9]=upper bits of threshold (19-bit field; fits
+    # exactly at SCORE_BITS=37, top bit unused at SCORE_BITS<37).
+    # RTL reads addr only from THRESH_L, so addr is ignored here.
+    return (0x3 << 28) | (((val >> 18) & 0x7FFFF) << 9)
 
 def _w_thresh_lower(val, addr):
+    # EVT_THRESH_L = 0x4: [27:10]=lower 18 bits of threshold, [9:7]=thresh addr (3b)
     return (0x4 << 28) | ((val & 0x3FFFF) << 10) | ((addr & 0x7) << 7)
 
 def _w_bin_length_upper(val):
@@ -666,7 +670,7 @@ def _append_flush_events(words, bin_length_us=BIN_LENGTH_US):
     `bin_length_us`, which matches `bin_duration_ts` inside voxel_binning.
     The first event whose timestamp crosses the next bin boundary triggers a
     rollover (voxel_binning.sv:188 — `(acc_event_ts - bin_start_ts) >=
-    bin_duration_ts`), so READOUT_BINS+2=10 spaced events guarantee enough
+    bin_duration_ts`), so READOUT_BINS+2=18 spaced events guarantee enough
     rollovers to flush every bin in the ring buffer regardless of the
     programmed bin length.
 
@@ -1079,20 +1083,24 @@ async def _stream_recording(dut, pins, bin_path):
     await _spi_stream(dut, pins, words, inter_gap=4,
                       progress_every=10_000, tag=stem)
 
-    # Drain: 50 000 cycles @ 64 MHz = 0.78 ms, well beyond
-    #   • voxel_binning final readout+clear cycles (8 × 513 = 4104)
-    #   • MAC engine settling (~2049)
-    #   • classifier 4-stage pipeline
-    dut._log.info("Recording consumed; draining pipeline (50 000 cycles) …")
+    # Drain: 300 000 cycles @ 64 MHz = 4.7 ms. After streaming we have
+    # ~READOUT_BINS+2 = 18 flush-driven bin rollovers queued in the binner.
+    # The classifier emits one gesture_valid pulse per rollover at ~128 µs
+    # throughput (16 bins × 513 readout cycles + 4-class MAC + 4-stage
+    # classifier pipeline). 18 pulses × 128 µs ≈ 2.3 ms — 50 000 cycles only
+    # captured the first 6, biasing the dominant class toward the noisy
+    # opening windows. 300 000 cycles covers all ~18 expected pulses plus
+    # margin.
+    dut._log.info("Recording consumed; draining pipeline (300 000 cycles) …")
 
     if use_pin_level_monitor:
         await _sample_miso_during_drain(
             dut, pins, result,
-            num_samples=50,
+            num_samples=300,
             gap_cycles=1000,
         )
     else:
-        await ClockCycles(dut.clk_PAD, 50_000)
+        await ClockCycles(dut.clk_PAD, 300_000)
         monitor_task.cancel()
 
     if not result.gestures:
