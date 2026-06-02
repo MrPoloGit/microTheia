@@ -42,11 +42,23 @@ FEATURE_COUNT            = GRID_SIZE * GRID_SIZE * READOUT_BINS
 CELLS_PER_BIN            = GRID_SIZE * GRID_SIZE
 TOTAL_CELLS              = NUM_BINS * CELLS_PER_BIN
 MAX_COUNTER              = (1 << COUNTER_BITS) - 1
+# SCORE_BITS, used to sign-extend thresholds read back from thresholds.mem.
+SCORE_BITS               = int(CFG.get("SCORE_BITS",
+                               COUNTER_BITS + WEIGHT_BITS + (FEATURE_COUNT - 1).bit_length() + 1))
 ASSERT_EXPECTED_LABEL    = int(os.environ.get("ASSERT_EXPECTED_LABEL", "1"))
-# Per-gesture expected-class ratio with the retrained 16-bin weights and
-# per-class noise-floor thresholds: wave_down 90%, wave_left 75%,
-# wave_right 100%, wave_up 90%. 0.70 is the user-requested floor.
-EXPECTED_LABEL_MIN_RATIO = float(os.environ.get("EXPECTED_LABEL_MIN_RATIO", "0.70"))
+# Per-gesture expected-class ratio with the retrained SIGNED 16-bin weights and
+# per-class signed thresholds. Measured on the test1 recordings via the Python
+# pipeline: Down 87.5%, Left 93.8%, Right 100%, Up 87.5% (pulse counts 16/16/16/16).
+# 0.80 is the required floor for all gestures.
+EXPECTED_LABEL_MIN_RATIO = float(os.environ.get("EXPECTED_LABEL_MIN_RATIO", "0.80"))
+
+
+def to_signed(val, bits):
+    """Interpret the low `bits` of `val` as a two's-complement signed integer."""
+    val &= (1 << bits) - 1
+    if val & (1 << (bits - 1)):
+        val -= (1 << bits)
+    return val
 
 GESTURE_NAMES = {0: "Down", 1: "Left", 2: "Right", 3: "Up"}
 EXPECTED_BIN_FILE_CLASS = {
@@ -318,7 +330,8 @@ class TimestampVoxelModel:
 
 def load_thresholds():
     """Load class and diff thresholds from thresholds.mem (hex, $readmemh format).
-    Returns a list of 2*NUM_CLASSES integers.
+    Thresholds are SIGNED SCORE_BITS values; the .mem stores two's-complement
+    hex, so sign-extend each entry. Returns a list of 2*NUM_CLASSES integers.
     """
     repo_root = Path(__file__).resolve().parents[1]
     thresh_path = repo_root / "weights" / "thresholds.mem"
@@ -329,7 +342,7 @@ def load_thresholds():
     vals = []
     for line in lines:
         try:
-            vals.append(int(line, 16))
+            vals.append(to_signed(int(line, 16), SCORE_BITS))
         except ValueError:
             vals.append(0)
     while len(vals) < 2 * NUM_CLASSES:
@@ -376,6 +389,7 @@ class ScoreModel:
 
 
 def load_weights_from_mem():
+    # Weights are SIGNED int8 stored as two's-complement hex; sign-extend each.
     repo_root = Path(__file__).resolve().parents[1]
     mem_keys = ["WEIGHT_MEM_C0", "WEIGHT_MEM_C1", "WEIGHT_MEM_C2", "WEIGHT_MEM_C3"]
     mem_defaults = [f"weights/{FEATURE_COUNT}weights_q8_c{c}.mem" for c in range(NUM_CLASSES)]
@@ -390,7 +404,7 @@ def load_weights_from_mem():
             if not line or line.startswith("//"):
                 continue
             try:
-                vals.append(int(line, 16))
+                vals.append(to_signed(int(line, 16), WEIGHT_BITS))
             except ValueError:
                 vals.append(0)
         while len(vals) < FEATURE_COUNT:

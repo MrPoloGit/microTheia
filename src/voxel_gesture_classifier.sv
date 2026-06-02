@@ -2,6 +2,11 @@
 // Copyright (c) 2026 Group G Contributors
 `timescale 1ns/1ps
 
+// Scores arrive as SIGNED two's-complement values (the MAC accumulates signed
+// weight×feature products). Every reduction, argmax and threshold comparison in
+// this module is therefore a SIGNED operation — a class with a negative winning
+// score must still be ordered correctly against the others and against its
+// (possibly negative) class threshold.
 module voxel_gesture_classifier #(
     parameter int NUM_CLASSES = 4,
     parameter int SCORE_BITS  = 37
@@ -47,15 +52,15 @@ module voxel_gesture_classifier #(
         end
     end
 
-    logic [SCORE_BITS-1:0] s0, s1, s2, s3;
+    logic signed [SCORE_BITS-1:0] s0, s1, s2, s3;
     assign s0 = scores_flat_r[0*SCORE_BITS +: SCORE_BITS];
     assign s1 = scores_flat_r[1*SCORE_BITS +: SCORE_BITS];
     assign s2 = scores_flat_r[2*SCORE_BITS +: SCORE_BITS];
     assign s3 = scores_flat_r[3*SCORE_BITS +: SCORE_BITS];
 
-    logic [SCORE_BITS-1:0] pair0_max_c, pair0_min_c;
-    logic [SCORE_BITS-1:0] pair1_max_c, pair1_min_c;
-    logic [1:0]            pair0_cls_c, pair1_cls_c;
+    logic signed [SCORE_BITS-1:0] pair0_max_c, pair0_min_c;
+    logic signed [SCORE_BITS-1:0] pair1_max_c, pair1_min_c;
+    logic [1:0]                   pair0_cls_c, pair1_cls_c;
 
     always_comb begin
         if (s0 >= s1) begin
@@ -70,10 +75,10 @@ module voxel_gesture_classifier #(
         end
     end
 
-    logic                  pair_valid_r;
-    logic [SCORE_BITS-1:0] pair0_max_r, pair0_min_r;
-    logic [SCORE_BITS-1:0] pair1_max_r, pair1_min_r;
-    logic [1:0]            pair0_cls_r, pair1_cls_r;
+    logic                         pair_valid_r;
+    logic signed [SCORE_BITS-1:0] pair0_max_r, pair0_min_r;
+    logic signed [SCORE_BITS-1:0] pair1_max_r, pair1_min_r;
+    logic [1:0]                   pair0_cls_r, pair1_cls_r;
 
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -91,9 +96,9 @@ module voxel_gesture_classifier #(
         end
     end
 
-    logic [SCORE_BITS-1:0] max_score_b, second_a_b, second_b_b, second_score_b;
-    logic [1:0]            max_class_b;
-    logic [SCORE_BITS-1:0] diff_b;
+    logic signed [SCORE_BITS-1:0] max_score_b, second_a_b, second_b_b, second_score_b;
+    logic [1:0]                   max_class_b;
+    logic signed [SCORE_BITS-1:0] diff_b;
 
     assign max_score_b    = (pair0_max_r >= pair1_max_r) ? pair0_max_r : pair1_max_r;
     assign max_class_b    = (pair0_max_r >= pair1_max_r) ? pair0_cls_r : pair1_cls_r;
@@ -103,10 +108,10 @@ module voxel_gesture_classifier #(
     assign diff_b         = max_score_b - second_score_b;
 
     // Stage-2 registers declared before the continuous assigns that reference them.
-    logic                  decision_valid_r;
-    logic [1:0]            max_class_r;
-    logic [SCORE_BITS-1:0] max_score_r;
-    logic [SCORE_BITS-1:0] diff_r;
+    logic                         decision_valid_r;
+    logic [1:0]                   max_class_r;
+    logic signed [SCORE_BITS-1:0] max_score_r;
+    logic signed [SCORE_BITS-1:0] diff_r;
 
     // Staggered reads: pair_valid_r issues class_thresh read, decision_valid_r issues
     // diff_thresh read one cycle later — single read port is never double-booked.
@@ -131,11 +136,15 @@ module voxel_gesture_classifier #(
         end
     end
 
-    logic                  decision_valid_r2;
-    logic [1:0]            max_class_r2;
-    logic [SCORE_BITS-1:0] max_score_r2;
-    logic [SCORE_BITS-1:0] diff_r2;
-    logic [SCORE_BITS-1:0] class_thresh_r;
+    logic                         decision_valid_r2;
+    logic [1:0]                   max_class_r2;
+    logic signed [SCORE_BITS-1:0] max_score_r2;
+    logic signed [SCORE_BITS-1:0] diff_r2;
+    logic signed [SCORE_BITS-1:0] class_thresh_r;
+
+    // Signed view of the threshold SRAM read data for the diff comparison below.
+    logic signed [SCORE_BITS-1:0] thresh_data_s;
+    assign thresh_data_s = thresh_data;
 
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -178,7 +187,7 @@ module voxel_gesture_classifier #(
                     gesture            <= max_class_r2;
                     gesture_valid      <= 1'b1;
                     // diff_thresh arrives this cycle (1 cycle after decision_valid_r).
-                    gesture_confidence <= (diff_r2 > thresh_data);
+                    gesture_confidence <= (diff_r2 > thresh_data_s);
                 end
             end
         end

@@ -19,11 +19,22 @@ NUM_CLASSES   = CFG.get("NUM_CLASSES",   4)
 
 COUNTER_MASK = (1 << COUNTER_BITS) - 1
 WEIGHT_MASK  = (1 << WEIGHT_BITS)  - 1
+# Weights are SIGNED two's-complement int8: range [-128, 127].
+WEIGHT_MIN   = -(1 << (WEIGHT_BITS - 1))
+WEIGHT_MAX   =  (1 << (WEIGHT_BITS - 1)) - 1
 
 SCORE_BITS = None
 SCORE_MASK = None
 
 EXPECTED_LATENCY = FEATURE_COUNT + 2
+
+
+def to_signed(val, bits):
+    """Interpret the low `bits` of `val` as a two's-complement signed integer."""
+    val &= (1 << bits) - 1
+    if val & (1 << (bits - 1)):
+        val -= (1 << bits)
+    return val
 
 
 def configure_from_dut(dut):
@@ -38,8 +49,12 @@ def configure_from_dut(dut):
 
 
 def golden_gemv(features, weights):
+    # Features are unsigned counters; weights are signed int8. Accumulate the
+    # true signed dot product, then mask to SCORE_BITS two's-complement to match
+    # the DUT's raw accumulator bits.
     return [
-        sum(int(features[i]) * int(weights[g][i]) for i in range(FEATURE_COUNT)) & SCORE_MASK
+        sum(int(features[i]) * to_signed(int(weights[g][i]), WEIGHT_BITS)
+            for i in range(FEATURE_COUNT)) & SCORE_MASK
         for g in range(NUM_CLASSES)
     ]
 
@@ -248,16 +263,32 @@ async def test_unit_weights(dut):
 
 @logged_test()
 async def test_all_max_values(dut):
-    """Max feature and weight values: verify no overflow truncation vs golden."""
+    """Max feature and max-positive weight: verify no overflow truncation vs golden."""
     await setup(dut)
     f = [COUNTER_MASK] * FEATURE_COUNT
-    w = [[WEIGHT_MASK] * FEATURE_COUNT for _ in range(NUM_CLASSES)]
+    w = [[WEIGHT_MAX] * FEATURE_COUNT for _ in range(NUM_CLASSES)]
     await run_gemv(dut, f, w, "max-max")
     got = unpack_scores(int(dut.scores_flat.value))
     exp = golden_gemv(f, w)
     assert got == exp, f"max*max mismatch\n  got={got}\n  exp={exp}"
     for g in range(NUM_CLASSES):
-        assert got[g] > 0, f"class {g}: expected nonzero for all-max inputs"
+        assert got[g] > 0, f"class {g}: expected nonzero positive for max-positive weights"
+
+
+@logged_test()
+async def test_min_max_magnitude(dut):
+    """Max feature with the most-negative weight (-128): largest-magnitude
+    negative product must accumulate without overflow vs the signed golden."""
+    await setup(dut)
+    f = [COUNTER_MASK] * FEATURE_COUNT
+    w = [[WEIGHT_MIN] * FEATURE_COUNT for _ in range(NUM_CLASSES)]
+    await run_gemv(dut, f, w, "max-min")
+    got = unpack_scores(int(dut.scores_flat.value))
+    exp = golden_gemv(f, w)
+    assert got == exp, f"max*min mismatch\n  got={got}\n  exp={exp}"
+    sign_bit = 1 << (SCORE_BITS - 1)
+    for g in range(NUM_CLASSES):
+        assert got[g] & sign_bit, f"class {g}: expected negative score for -128 weights"
 
 
 @logged_test()
@@ -265,7 +296,7 @@ async def test_accumulator_clears_between_runs(dut):
     """Run with all-max then all-zero; second result must be exactly zero."""
     await setup(dut)
     f_large = [COUNTER_MASK] * FEATURE_COUNT
-    w_large = [[WEIGHT_MASK] * FEATURE_COUNT for _ in range(NUM_CLASSES)]
+    w_large = [[WEIGHT_MAX] * FEATURE_COUNT for _ in range(NUM_CLASSES)]
     await run_gemv(dut, f_large, w_large, "fill-accum")
 
     f_zero = [0] * FEATURE_COUNT
@@ -329,7 +360,7 @@ async def test_back_to_back_runs(dut):
 
     for trial in range(5):
         f = [rng.randint(0, COUNTER_MASK) for _ in range(FEATURE_COUNT)]
-        w = [[rng.randint(0, WEIGHT_MASK) for _ in range(FEATURE_COUNT)]
+        w = [[rng.randint(WEIGHT_MIN, WEIGHT_MAX) for _ in range(FEATURE_COUNT)]
              for _ in range(NUM_CLASSES)]
         cyc = await run_gemv(dut, f, w, f"b2b-{trial}")
         assert cyc == EXPECTED_LATENCY, \
@@ -374,21 +405,55 @@ async def test_randomized_golden(dut):
     rng = random.Random(0x5A57A11C)
     for trial in range(10):
         f = [rng.randint(0, COUNTER_MASK) for _ in range(FEATURE_COUNT)]
-        w = [[rng.randint(0, WEIGHT_MASK) for _ in range(FEATURE_COUNT)]
+        w = [[rng.randint(WEIGHT_MIN, WEIGHT_MAX) for _ in range(FEATURE_COUNT)]
              for _ in range(NUM_CLASSES)]
         await run_gemv(dut, f, w, f"rnd-{trial}")
 
 
 @logged_test()
 async def test_stress_high_range(dut):
-    """15 trials with values near the max of each field; stresses the accumulator."""
+    """15 trials with near-max-magnitude values of BOTH signs; stresses the
+    signed accumulator at its positive and negative extremes."""
     await setup(dut)
     rng = random.Random(0xFACEFEED)
     for trial in range(15):
         f = [rng.randint(COUNTER_MASK // 2, COUNTER_MASK) for _ in range(FEATURE_COUNT)]
-        w = [[rng.randint(WEIGHT_MASK  // 2, WEIGHT_MASK)  for _ in range(FEATURE_COUNT)]
+        # Cluster weights near -128 or near +127 so partial sums swing hard in
+        # both directions within a single accumulation.
+        w = [[(rng.randint(WEIGHT_MIN, WEIGHT_MIN + 8) if rng.random() < 0.5
+               else rng.randint(WEIGHT_MAX - 8, WEIGHT_MAX))
+              for _ in range(FEATURE_COUNT)]
              for _ in range(NUM_CLASSES)]
         await run_gemv(dut, f, w, f"stress-{trial}")
+
+
+@logged_test()
+async def test_negative_weights(dut):
+    """All-negative int8 weights produce negative (sign-bit-set) scores that
+    match the signed golden model exactly."""
+    await setup(dut)
+    f = [COUNTER_MASK] * FEATURE_COUNT
+    w = [[(WEIGHT_MIN if g == 0 else -1) for _ in range(FEATURE_COUNT)]
+         for g in range(NUM_CLASSES)]
+    await run_gemv(dut, f, w, "neg-weights")
+    got = unpack_scores(int(dut.scores_flat.value))
+    exp = golden_gemv(f, w)
+    assert got == exp, f"neg-weights mismatch\n  got={got}\n  exp={exp}"
+    sign_bit = 1 << (SCORE_BITS - 1)
+    for g in range(NUM_CLASSES):
+        assert got[g] & sign_bit, f"class {g}: expected negative score"
+
+
+@logged_test()
+async def test_mixed_sign_golden(dut):
+    """8 random trials with mixed-sign weights: scores must match signed golden."""
+    await setup(dut)
+    rng = random.Random(0x5169ED)
+    for trial in range(8):
+        f = [rng.randint(0, COUNTER_MASK) for _ in range(FEATURE_COUNT)]
+        w = [[rng.randint(WEIGHT_MIN, WEIGHT_MAX) for _ in range(FEATURE_COUNT)]
+             for _ in range(NUM_CLASSES)]
+        await run_gemv(dut, f, w, f"mixed-{trial}")
 
 
 @logged_test()
