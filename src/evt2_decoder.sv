@@ -4,6 +4,11 @@
 
 // EVT2 word fields: [31:28] type, [27:22] ts_lsb, [21:11] x, [10:0] y
 // Packet types: 0x0 CD_OFF, 0x1 CD_ON, 0x8 TIME_HIGH
+//
+// Weight (EVT_WEIGHT) and threshold (EVT_THRESH_U/L) payloads are SIGNED
+// two's-complement values (int8 weights, signed SCORE_BITS thresholds). They are
+// transported and written into their SRAMs as raw bit patterns here — the signed
+// interpretation lives in the MAC engine / gesture classifier that read them.
 
 module evt2_decoder #(
     parameter int SENSOR_WIDTH      = 320,
