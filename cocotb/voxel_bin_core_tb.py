@@ -558,6 +558,7 @@ class CoreHarness:
         evt = self.decoder.on_word(word)
         if evt is not None:
             self.expected_decoded.append(evt)
+            self.next_event_ts = max(self.next_event_ts, int(evt[2]) + 1)
         self.accepted_words += 1
 
     async def send_grid_event(self, gx, gy, pkt=EVT_CD_ON, ts=None):
@@ -1215,6 +1216,220 @@ async def test_bin_file_gesture_3(dut):
     path = bin_files[3]
     label = Path(path).stem
     await _run_bin_file_test(dut, path, label, expected_class=EXPECTED_BIN_FILE_CLASS[3])
+
+
+@logged_test()
+async def test_back_to_back_gesture_rollover(dut):
+    """Stream all gesture recordings back-to-back without reset.
+
+    This is a rollover/transition stress test for voxel_bin_core.  The test
+    streams each real .bin recording in sequence during the same simulation
+    run.  Between recordings it forces only enough bin rollovers for the current
+    recording to produce its expected gesture, then immediately starts the next
+    recording.  Override the default Down -> Left -> Right -> Up order with
+    ROLLOVER_SEQUENCE, for example "2,3,0,1".
+    """
+
+    bin_files = _resolve_bin_files()
+    sequence_text = os.getenv("ROLLOVER_SEQUENCE")
+    if sequence_text is None and (
+        "ROLLOVER_FIRST_IDX" in os.environ or "ROLLOVER_SECOND_IDX" in os.environ
+    ):
+        rollover_indices = [
+            int(os.getenv("ROLLOVER_FIRST_IDX", "2")),
+            int(os.getenv("ROLLOVER_SECOND_IDX", "3")),
+        ]
+    else:
+        sequence_text = sequence_text or "0,1,2,3"
+        rollover_indices = [int(p.strip()) for p in sequence_text.split(",") if p.strip()]
+
+    if len(rollover_indices) < 2:
+        raise ValueError("Rollover sequence must contain at least two recordings")
+    if len(set(rollover_indices)) != len(rollover_indices):
+        raise ValueError(f"Rollover sequence must not repeat recordings: {rollover_indices}")
+    invalid = [i for i in rollover_indices if i < 0 or i >= len(bin_files)]
+    if invalid:
+        raise ValueError(
+            f"Invalid rollover indices: {invalid}; sequence={rollover_indices}, "
+            f"valid range is 0..{len(bin_files) - 1}"
+        )
+    missing_expected = [i for i in rollover_indices if i not in EXPECTED_BIN_FILE_CLASS]
+    if missing_expected:
+        raise ValueError(f"No expected class mapping for rollover indices: {missing_expected}")
+
+    weights = load_weights_from_mem()
+    score_model = ScoreModel(weights)
+    # This replays large real recordings while prior readout/MAC work may still
+    # be draining.  Match the other .bin replay tests by scoring the DUT's
+    # emitted feature windows; the synthetic tests above keep strict timestamp
+    # golden-model coverage.
+    h = CoreHarness(dut, score_model=score_model, check_feature_windows=False)
+
+    await h.setup()
+    await _flush_stale_bins(h, weights=weights)
+
+    def _time_highs(words):
+        return [int(w) & 0x0FFFFFFF for w in words if ((int(w) >> 28) & 0xF) == EVT_TIME_HIGH]
+
+    def _shift_time_highs(words, offset_th):
+        shifted = []
+        for w in words:
+            w = int(w) & 0xFFFFFFFF
+            if ((w >> 28) & 0xF) == EVT_TIME_HIGH:
+                th = ((w & 0x0FFFFFFF) + int(offset_th)) & 0x0FFFFFFF
+                shifted.append((EVT_TIME_HIGH << 28) | th)
+            else:
+                shifted.append(w)
+        return shifted
+
+    async def _stream_words(words, label, progress_every=25_000):
+        total = len(words)
+        cocotb.log.info(f"[{label}] streaming {total} EVT2 words")
+        for i, word in enumerate(words):
+            await h.send_word(int(word))
+            if progress_every and (i + 1) % progress_every == 0:
+                cocotb.log.info(f"[{label}] streamed {i + 1}/{total} words")
+
+    def _rebase_after_current_time(words, label):
+        time_highs = _time_highs(words)
+        if not time_highs:
+            return words
+
+        target_first_th = (h.next_event_ts >> 6) + 2
+        offset_th = target_first_th - time_highs[0]
+        cocotb.log.info(
+            f"[{label}] rebasing TIME_HIGH by offset_th={offset_th} "
+            f"so first TIME_HIGH moves {time_highs[0]} -> {target_first_th}"
+        )
+        return _shift_time_highs(words, offset_th)
+
+    final_tail_len = max(3, READOUT_BINS // 2)
+
+    def _segment_expected_count(expected_class, start_obs_index):
+        return sum(1 for g, _ in h.observed_gestures[start_obs_index:] if g == expected_class)
+
+    async def _force_until_expected_seen(label, expected_class, start_obs_index):
+        seen = _segment_expected_count(expected_class, start_obs_index)
+        if seen:
+            cocotb.log.info(
+                f"[{label}] already observed {seen} "
+                f"{GESTURE_NAMES[expected_class]} output(s)"
+            )
+            return
+
+        for _ in range(READOUT_BINS + 8):
+            await h.force_bin_rollover()
+            for _ in range(20_000):
+                await h.tick(1)
+                seen = _segment_expected_count(expected_class, start_obs_index)
+                if seen:
+                    cocotb.log.info(
+                        f"[{label}] observed {seen} "
+                        f"{GESTURE_NAMES[expected_class]} output(s); transitioning"
+                    )
+                    return
+
+        outputs = h.observed_gestures[start_obs_index:]
+        raise AssertionError(
+            f"[{label}] did not produce {GESTURE_NAMES[expected_class]} before transition; "
+            f"outputs={outputs}"
+        )
+
+    sequence_desc = " -> ".join(
+        f"{Path(bin_files[i]).stem} ({GESTURE_NAMES[EXPECTED_BIN_FILE_CLASS[i]]})"
+        for i in rollover_indices
+    )
+
+    cocotb.log.info(
+        f"Back-to-back rollover sequence: {sequence_desc}"
+    )
+
+    segment_records = []
+    for seq_pos, file_idx in enumerate(rollover_indices):
+        path = bin_files[file_idx]
+        expected_class = EXPECTED_BIN_FILE_CLASS[file_idx]
+        label = f"{seq_pos + 1}/{len(rollover_indices)}:{Path(path).stem}"
+        start_obs_index = len(h.observed_gestures)
+        start_exp_index = len(h.expected_gestures)
+        words = _read_evt2_bin(path)
+
+        if seq_pos > 0:
+            words = _rebase_after_current_time(words, label)
+
+        cocotb.log.info(
+            f"[{label}] starting {GESTURE_NAMES[expected_class]} "
+            f"with observed_so_far={h.observed_gestures}"
+        )
+        await _stream_words(words, label)
+
+        record = {
+            "label": label,
+            "expected_class": expected_class,
+            "start_obs": start_obs_index,
+            "start_exp": start_exp_index,
+            "end_obs": None,
+            "end_exp": None,
+        }
+        segment_records.append(record)
+
+        if seq_pos < len(rollover_indices) - 1:
+            await _force_until_expected_seen(label, expected_class, start_obs_index)
+            record["end_obs"] = len(h.observed_gestures)
+            record["end_exp"] = len(h.expected_gestures)
+            cocotb.log.info(
+                f"[{label}] transition point reached; immediately starting next recording "
+                f"without reset/idling"
+            )
+
+    # Now drain completely so the scoreboard can compare every queued output.
+    for _ in range(READOUT_BINS + 4):
+        await h.force_bin_rollover()
+    await h.wait_quiet(timeout=2_000_000)
+    segment_records[-1]["end_obs"] = len(h.observed_gestures)
+    segment_records[-1]["end_exp"] = len(h.expected_gestures)
+
+    assert not h.pending_score_checks, "Scoreboard still has pending checks after rollover test"
+    assert h.observed_gestures == h.expected_gestures, (
+        "Back-to-back rollover mismatch:\n"
+        f"  observed={h.observed_gestures}\n"
+        f"  expected={h.expected_gestures}"
+    )
+
+    segment_summaries = []
+    for record in segment_records:
+        expected_class = record["expected_class"]
+        outputs = h.observed_gestures[record["start_obs"]:record["end_obs"]]
+        expected_outputs = h.expected_gestures[record["start_exp"]:record["end_exp"]]
+        assert outputs == expected_outputs, (
+            f"[{record['label']}] DUT/model mismatch:\n"
+            f"  observed={outputs}\n"
+            f"  expected={expected_outputs}"
+        )
+        assert any(g == expected_class for g, _ in outputs), (
+            f"[{record['label']}] no {GESTURE_NAMES[expected_class]} output observed: "
+            f"{outputs}"
+        )
+
+        tail_len = final_tail_len if record is segment_records[-1] else min(len(outputs), final_tail_len)
+        tail = outputs[-tail_len:]
+        tail_classes = [g for g, _ in tail]
+        tail_majority, tail_ratio, tail_hist = _majority_with_ratio(tail_classes)
+        if record is segment_records[-1]:
+            assert tail_majority == expected_class, (
+                f"[{record['label']}] final tail did not converge to "
+                f"{GESTURE_NAMES[expected_class]}: "
+                f"tail={[(GESTURE_NAMES.get(g, g), c) for g, c in tail]}, "
+                f"majority={GESTURE_NAMES.get(tail_majority, tail_majority)}, "
+                f"ratio={tail_ratio:.2f}, hist={tail_hist}"
+            )
+        segment_summaries.append(
+            f"{record['label']}={GESTURE_NAMES[expected_class]} "
+            f"outputs={len(outputs)} tail_ratio={tail_ratio:.2f}"
+        )
+
+    cocotb.log.info(
+        "PASS back-to-back rollover sequence: " + "; ".join(segment_summaries)
+    )
 
 
 @logged_test()
