@@ -25,7 +25,16 @@ CLASS_THRESHOLDS = [0, 0, 0, 0]
 DIFF_THRESHOLDS  = [0, 0, 0, 0]
 
 
+def to_signed(val, bits):
+    """Interpret the low `bits` of `val` as a two's-complement signed integer."""
+    val &= (1 << bits) - 1
+    if val & (1 << (bits - 1)):
+        val -= (1 << bits)
+    return val
+
+
 def pack_scores(scores):
+    # Scores are SIGNED; pack the two's-complement low SCORE_BITS of each.
     packed = 0
     for i, s in enumerate(scores):
         packed |= (s & SCORE_MASK) << (i * SCORE_BITS)
@@ -55,7 +64,9 @@ class GestureClassifierModel:
         if not scores_valid:
             return
 
-        scores = [(scores_flat >> (i * SCORE_BITS)) & SCORE_MASK
+        # Scores are SIGNED two's-complement values — sign-extend before any
+        # comparison so the argmax/threshold logic matches the signed RTL.
+        scores = [to_signed((scores_flat >> (i * SCORE_BITS)) & SCORE_MASK, SCORE_BITS)
                   for i in range(NUM_CLASSES)]
 
         if scores[0] >= scores[1]:
@@ -77,8 +88,8 @@ class GestureClassifierModel:
         second_score = second_a if second_a >= second_b else second_b
         diff         = max_score - second_score
 
-        class_thresh = CLASS_THRESHOLDS[max_class]
-        diff_thresh  = DIFF_THRESHOLDS[max_class]
+        class_thresh = to_signed(CLASS_THRESHOLDS[max_class] & SCORE_MASK, SCORE_BITS)
+        diff_thresh  = to_signed(DIFF_THRESHOLDS[max_class] & SCORE_MASK, SCORE_BITS)
 
         self.class_gesture = max_class
         self.class_valid   = 1
@@ -255,14 +266,55 @@ async def test_tie_break(dut):
 
 @logged_test()
 async def test_large_score_no_overflow(dut):
-    """Near-maximum unsigned values must not overflow the diff computation."""
+    """Near-maximum positive values must not overflow the diff computation."""
     await setup(dut)
     model = GestureClassifierModel()
 
-    huge = (1 << 28) - 1
+    huge = (1 << (SCORE_BITS - 2))   # large but safely below the sign bit
     await drive_and_check(dut, model, [huge, 1, 1, 1], 1, "huge")
     assert int(dut.gesture_valid.value) == 1
     assert int(dut.gesture_confidence.value) == 1
+
+
+@logged_test()
+async def test_signed_negative_scores(dut):
+    """Signed argmax: among all-negative scores the least-negative class wins.
+    With the default zero thresholds it must NOT pass (max_score < 0)."""
+    await setup(dut)
+    model = GestureClassifierModel()
+
+    # class 2 (-3) is the maximum; an unsigned compare would rank it lowest.
+    await drive_and_check(dut, model, [-5, -10, -3, -100], 1, "neg-winner")
+    assert int(dut.class_gesture.value) == 2, \
+        f"expected winner class 2, got {int(dut.class_gesture.value)}"
+    assert int(dut.class_pass.value) == 0, "negative max must fail the zero threshold"
+    assert int(dut.gesture_valid.value) == 0
+
+
+@logged_test()
+async def test_signed_mixed_scores(dut):
+    """A positive winner among negative competitors classifies and passes."""
+    await setup(dut)
+    model = GestureClassifierModel()
+
+    await drive_and_check(dut, model, [-1000, 250, -7, 249], 1, "mixed")
+    assert int(dut.class_gesture.value) == 1
+    assert int(dut.gesture_valid.value) == 1
+    assert int(dut.gesture.value) == 1
+
+
+@logged_test()
+async def test_randomized_signed_scoreboard(dut):
+    """Random signed scores: DUT must match the signed golden model for 500 cycles."""
+    await setup(dut)
+    model = GestureClassifierModel()
+    rng   = random.Random(0x5169B0A4)
+
+    span = 1 << 20
+    for cycle in range(500):
+        valid  = rng.choice([0, 1, 1, 1])
+        scores = [rng.randint(-span, span - 1) for _ in range(NUM_CLASSES)]
+        await drive_and_check(dut, model, scores, valid, f"srnd-{cycle}")
 
 
 @logged_test()

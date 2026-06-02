@@ -2,6 +2,11 @@
 // Copyright (c) 2026 Group G Contributors
 `timescale 1ns/1ps
 
+// Weights are SIGNED two's-complement int8 (range -128..127). Features are the
+// unsigned event counters from the feature RAM. The MAC therefore performs a
+// signed×unsigned multiply and accumulates into a signed score, so a class can
+// learn negative evidence ("this gesture is NOT active here"). Downstream the
+// gesture classifier compares the resulting scores as signed quantities.
 module voxel_mac_engine #(
     parameter int FEATURE_COUNT = 4096,
     parameter int COUNTER_BITS  = 16,
@@ -42,7 +47,7 @@ module voxel_mac_engine #(
     logic                   mac_valid; // data from last cycle's read is ready to accumulate
     logic                   mac_last;  // this is the final accumulation
 
-    logic [SCORE_BITS-1:0]  score_acc [0:NUM_CLASSES-1];
+    logic signed [SCORE_BITS-1:0]  score_acc [0:NUM_CLASSES-1];
 
     // rd_addr held at 0 when idle to avoid X propagation in simulation.
     assign rd_en   = (state == ST_STREAM) && (stream_idx < STREAM_BITS'(FEATURE_COUNT));
@@ -96,12 +101,18 @@ module voxel_mac_engine #(
 
                     if (mac_valid) begin
                         for (int g = 0; g < NUM_CLASSES; g++) begin
-                            // Keep operand widths tight: 16-bit × 8-bit = 24-bit product,
-                            // zero-extended to SCORE_BITS before accumulation.
-                            logic [COUNTER_BITS+WEIGHT_BITS-1:0] product;
-                            product = feature_data *
-                                      weight_data_flat[g*WEIGHT_BITS +: WEIGHT_BITS];
-                            score_acc[g] <= score_acc[g] + SCORE_BITS'(product);
+                            // Signed MAC: the feature is an unsigned event counter
+                            // (always >= 0), so zero-extend it by one bit into a
+                            // signed container; the weight is signed int8. The
+                            // 17-bit × 8-bit product is a signed 25-bit value that
+                            // sign-extends to SCORE_BITS in the signed accumulate.
+                            logic signed [COUNTER_BITS:0]             feat_s;
+                            logic signed [WEIGHT_BITS-1:0]            weight_s;
+                            logic signed [COUNTER_BITS+WEIGHT_BITS:0] product;
+                            feat_s   = $signed({1'b0, feature_data});
+                            weight_s = $signed(weight_data_flat[g*WEIGHT_BITS +: WEIGHT_BITS]);
+                            product  = feat_s * weight_s;
+                            score_acc[g] <= score_acc[g] + product;
                         end
                     end
 

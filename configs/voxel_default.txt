@@ -26,6 +26,9 @@ MAP_FLIP_Y          = 0
 N                   = 16
 DATA_BIT_SIZE       = 16
 
+# Weights are SIGNED two's-complement int8 (-128..127). WEIGHT_BITS stays 8 and
+# SCORE_BITS is unchanged: the signed-magnitude worst case (|w|<=128) is smaller
+# than the old unsigned one (w<=255), so the existing accumulator width still fits.
 WEIGHT_BITS         = 8
 WEIGHT_SCALE        = 1024
 

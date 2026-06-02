@@ -7,6 +7,10 @@
 // weight_wr_* / thresh_wr_* ports before classification begins.
 // All four weight SRAMs share the same write address; the class is
 // selected by weight_wr_class_i.
+//
+// Weights are SIGNED int8 and thresholds are SIGNED SCORE_BITS values; the SRAMs
+// store the raw two's-complement bits and the signedness is resolved by the MAC
+// engine and gesture classifier downstream.
 
 module voxel_bin_core #(
     parameter int CLK_FREQ_HZ       = 64_000_000,
