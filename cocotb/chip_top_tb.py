@@ -704,33 +704,57 @@ def _resolve_bin_files():
 def _resolve_handle(dut, path):
     """Resolve a signal handle ONCE. Returns the handle or None.
 
-    Tries:
-      RTL: dotted hierarchical attr access (dut.i_chip_core.u_soc.gesture_valid).
-      GL : flat netlist — signal lives as a TOP-LEVEL escaped wire on chip_top
-           (e.g. `\\i_chip_core.u_soc.gesture_valid `). Access via dict-style
-           lookup. Tries both with and without the trailing space.
-
-    Resolving handles is expensive (allocates VPI objects); calling
-    `dut[name]` in a polling loop leaks memory because every call creates a
-    fresh SimHandleBase. Cache the result and reuse.
+    Works for:
+      RTL: dut.i_chip_core.u_soc.gesture_valid
+      GL : dut["\\i_chip_core.u_soc.gesture_valid "]
+      STA wrapper: dut.<chip_top_instance>["\\i_chip_core.u_soc.gesture_valid "]
     """
-    # RTL hierarchy
+
+    # Try direct RTL hierarchy from current dut
     try:
         obj = dut
         for part in path.split("."):
             obj = getattr(obj, part)
-        _ = int(obj.value)  # probe so we know it resolves cleanly
+        _ = int(obj.value)
         return obj
     except Exception:
         pass
-    # GL escaped names
+
+    # Try escaped GL names directly under current dut
     for name in (f"\\{path} ", f"\\{path}"):
         try:
             h = dut[name]
             _ = int(h.value)
             return h
         except Exception:
+            pass
+
+    # STA SDF wrapper case: chip_top is one level below the wrapper
+    for child_name in ("chip_top", "uut", "u_dut", "dut", "u_chip_top"):
+        try:
+            child = getattr(dut, child_name)
+        except Exception:
             continue
+
+        # Try RTL-like hierarchy under child
+        try:
+            obj = child
+            for part in path.split("."):
+                obj = getattr(obj, part)
+            _ = int(obj.value)
+            return obj
+        except Exception:
+            pass
+
+        # Try escaped GL names under child
+        for name in (f"\\{path} ", f"\\{path}"):
+            try:
+                h = child[name]
+                _ = int(h.value)
+                return h
+            except Exception:
+                pass
+
     return None
 
 
@@ -1069,7 +1093,7 @@ async def _stream_recording(dut, pins, bin_path):
     # STA GLS uses chip_top_sdf_wrapper, so internal gate-level signal paths
     # are harder to resolve. For STA GLS, use the SPI-visible debug readback
     # path instead.
-    use_pin_level_monitor = os.getenv("TIMING", "").lower() not in ("", "0", "false", "no")
+    use_pin_level_monitor = False
 
     if use_pin_level_monitor:
         monitor_task = None
