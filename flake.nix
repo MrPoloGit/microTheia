@@ -9,7 +9,7 @@
   };
 
   inputs = {
-    librelane.url = "github:librelane/librelane/3.0.3";
+    librelane.url = "github:librelane/librelane/dev";
   };
 
   outputs =
@@ -25,6 +25,7 @@
       lib = nixpkgs.lib;
     in
     {
+      # Outputs
       legacyPackages = nix-eda.forAllSystems (
         system:
         import nixpkgs {
@@ -45,6 +46,7 @@
         system:
         let
           pkgs = (self.legacyPackages.${system});
+          callPackage = lib.callPackageWith pkgs;
         in
         {
           default = pkgs.librelane-shell.override ({
