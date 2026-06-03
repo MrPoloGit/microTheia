@@ -1,7 +1,7 @@
 # μTheia
-μTheia is a GF180MCU event-based machine vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16×16 spatial grid, bins events into 8 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports pattern detection for the 4 programmable classes through SPI or selectable physical debug/output pins.
+μTheia is a GF180MCU event-based machine vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16×16 spatial grid, bins events into 16 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports pattern detection for the 4 programmable classes through SPI or selectable physical debug/output pins.
 
-<img width="707" height="916" alt="image" src="https://github.com/user-attachments/assets/6946b43c-fa27-4db2-a234-15927c1d33fe" />
+<img width="657" height="855" alt="image" src="https://github.com/user-attachments/assets/28d2bab8-3486-4232-8110-f9bdbcd9f0cf" />
 
 Project uses wafer.space MPW and runs using the gf180mcu PDK.
 
