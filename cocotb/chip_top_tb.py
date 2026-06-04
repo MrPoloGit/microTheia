@@ -1651,7 +1651,12 @@ def chip_top_runner():
         )
 
         if pdk_io_v.exists():
-            sources += [pdk_io_v, pdk_wsio_v, pdk_sram_v]
+            sources.append(pdk_io_v)
+            # gf180mcu_ws_io.v is absent from some PDK commits; the project
+            # maintains a sim/ copy that is always correct for RTL simulation.
+            ws_io_sim = proj_path / "../sim/gf180mcu_ws_io.v"
+            sources.append(ws_io_sim if ws_io_sim.exists() else pdk_wsio_v)
+            sources.append(pdk_sram_v)
         else:
             print(
                 f"[chip_top_tb] PDK not found at {pdk_root}/{pdk}; using sim/io_stubs.v"
