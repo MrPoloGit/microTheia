@@ -250,18 +250,20 @@ STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinserti
 # STA_SDF below for why we preprocess it.
 STA_SDF_RAW ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/54-openroad-stapostpnr/$(STA_CORNER)/chip_top__$(STA_CORNER).sdf
 # Icarus-friendly SDF produced from STA_SDF_RAW by scripts/sdf_fix_for_icarus.py.
-# Icarus 13's SDF parser has two specific gaps that make the raw file fatal:
+# Icarus 13's SDF parser has three specific gaps that make the raw file fatal:
 #   1. (VOLTAGE max::min) / (TEMPERATURE max::min) header triplets have an
 #      empty typ slot. Icarus aborts with "Chosen value not defined".
 #   2. INTERCONNECT entries that reference IO pad / SRAM instances with
 #      escaped names (e.g. `analog\[1\]\.pad.ASIG5V`) crash vvp with a NULL
 #      handle in vpi_scan — Icarus's path splitter doesn't honour SDF v3.0
 #      backslash escapes inside INTERCONNECT scopes.
-# The preprocessor fixes the triplets and strips just the unannotatable
-# INTERCONNECT entries (all of which carry sub-ns or zero delays). Cell-level
-# IOPATHs, TIMINGCHECKs, and conditional delays — the real timing data — are
-# left untouched.
-STA_SDF ?= $(MAKEFILE_DIR)/cocotb/chip_top__$(STA_CORNER).icarus.sdf
+#   3. CELL blocks for flattened instance names with escaped dots/brackets hit
+#      the same path-splitting limitation and cannot be annotated by Icarus.
+# The preprocessor fixes the triplets and strips unannotatable INTERCONNECT
+# entries plus CELL blocks whose flattened instance names contain escaped dots
+# or brackets. Flat std-cell IOPATHs, TIMINGCHECKs, and conditional delays
+# are left untouched.
+STA_SDF ?= $(MAKEFILE_DIR)/cocotb/sdf/$(STA_RUN)/chip_top__$(STA_CORNER).icarus.sdf
 
 $(STA_SDF): $(STA_SDF_RAW) $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py
 	python3 $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py $(STA_SDF_RAW) $(STA_SDF)
