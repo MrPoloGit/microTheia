@@ -83,13 +83,6 @@ ICE40_MAKEFILE := ice40/ice40.mk
 # Example: make sim DUT=voxel_bin_core_parallel TB=voxel_bin_core
 TB ?= $(DUT)
 
-# help: ## Show this help message
-# 	@echo 'Usage: make [target]'
-# 	@echo ''
-# 	@echo 'Available targets:'
-# 	@grep -E '^[a-zA-Z0-9_-]+:[^#]*## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":[^#]*## "}; {printf "  %-20s %s\n", $$1, $$2}'
-# .PHONY: help
-
 # install-3v3-scl: ## Install the 3.3V standard cell library into the PDK
 # 	git submodule update --init libs/gf180mcu_as_sc_mcu7t3v3 libs/gf180mcu_ocd_ip_sram
 # 	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.ref/gf180mcu_as_sc_mcu7t3v3 $(PDK_ROOT)/$(PDK)/libs.ref/
@@ -104,7 +97,7 @@ help: ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
 	@echo 'Available targets:'
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:[^#]*## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":[^#]*## "}; {printf "  %-20s %s\n", $$1, $$2}'
 .PHONY: help
 
 all: librelane ## Build the project (runs LibreLane)
@@ -116,13 +109,11 @@ $(PDK_ROOT)/$(PDK):
 clone-pdk: $(PDK_ROOT)/$(PDK) ## Clone the gf180mcu PDK
 .PHONY: clone-pdk
 
-# NEW THING ------------------------------------------------------------------------
 config-pdk:
 	$(MAKE) clone-pdk
 	git lfs pull
 	git submodule update --init third_party/verilog_spi
 .PHONY: config-pdk
-# ----------------------------------------------------------------------------------
 
 # Need to find a better way to
 # pass the variables to LibreLane
@@ -165,7 +156,6 @@ librelane-padring: $(PDK_ROOT)/$(PDK) defines ## Only create the padring
 	python3 scripts/padring.py ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS}
 .PHONY: librelane-padring
 
-# NEW THING ------------------------------------------------------------
 lint: ## Lint all SystemVerilog files in src
 	verilator --lint-only \
 	          -Wall \
@@ -173,13 +163,12 @@ lint: ## Lint all SystemVerilog files in src
 	          -flife lint.vlt \
 	          $(SV_SRCS)
 .PHONY: lint
-# ------------------------------------------------------------
 
 sim: $(PDK_ROOT)/$(PDK) defines ## Run RTL simulation with cocotb
 	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim
 
-# NEW THING ------------------------------------------------------------
+# how we ran old THING ------------------------------------------------------------
 sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	@if [ -z "$(DUT)" ]; then \
 		$(MAKE) sim-chip-top; \
@@ -219,6 +208,10 @@ sim-all: ## Test all the modules against Makefile compile args
 	$(MAKE) sim DUT=sram_wrapper CONFIG=sram_wrapper
 	$(MAKE) sim DUT=input_fifo
 	$(MAKE) sim DUT=evt2_decoder
+	$(MAKE) sim DUT=control_fsm
+	$(MAKE) sim DUT=soc
+	$(MAKE) sim DUT=spi_wrapper
+	$(MAKE) sim DUT=sram_wrapper
 	$(MAKE) sim DUT=voxel_gesture_classifier
 	$(MAKE) sim DUT=voxel_mac_engine
 	$(MAKE) sim DUT=voxel_binning
@@ -265,8 +258,8 @@ sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
 .PHONY: sim-view
 
-# NEW THINGS ------------------------------------------------------------
-# # Stage-specific GLS netlists from the latest librelane run.
+# How we ran it old THINGS ------------------------------------------------------------
+# Stage-specific GLS netlists from the latest librelane run.
 GL_SYNTH_NETLIST := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/06-yosys-synthesis/chip_top.nl.v
 GL_FP_NETLIST    := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/13-openroad-floorplan/chip_top.pnl.v
 GL_PNR_NETLIST   := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/51-openroad-fillinsertion/chip_top.pnl.v
