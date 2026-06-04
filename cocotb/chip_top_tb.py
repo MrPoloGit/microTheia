@@ -703,7 +703,6 @@ def _resolve_bin_files():
 
 def _resolve_handle(dut, path):
     """Resolve a signal handle ONCE. Returns the handle or None.
-
     Works for:
       RTL: dut.i_chip_core.u_soc.gesture_valid
       GL : dut["\\i_chip_core.u_soc.gesture_valid "]
@@ -738,7 +737,6 @@ def _resolve_handle(dut, path):
                 return h
             except Exception:
                 pass
-
     return None
 
 
@@ -927,7 +925,6 @@ class _GestureResult:
         self.gesture    = None         # dominant gesture (set after collection)
         self.confidence = None         # confidence of dominant class (last pulse)
         self.gestures   = []           # ordered list of (gesture, confidence)
-        self._last_seen_miso_class = (0, 0)  # MISO/debug-page dedupe baseline
 
     def dominant(self):
         """(gesture, confidence) of the most-frequent class. None if empty.
@@ -952,34 +949,6 @@ class _GestureResult:
                 return g, c
 
         return None, None
-
-
-def _record_miso_value(dut, result, miso, source):
-    """Decode one SPI MISO word as (gesture, confidence) and record transitions.
-
-    The debug/readback register powers up as (Down, confidence=0), so the
-    _GestureResult baseline starts at (0, 0).  Only record changes from the
-    previous observed readback value; this treats a held readback value as
-    "no new classification pulse" while still allowing real low-confidence
-    transitions to show up if the gesture bits change.
-    """
-    gesture    = (int(miso) >> (DATA_WIDTH - 3)) & 0x3
-    confidence = (int(miso) >> (DATA_WIDTH - 1)) & 0x1
-    cur = (gesture, confidence)
-
-    if cur == result._last_seen_miso_class:
-        return False
-
-    result._last_seen_miso_class = cur
-    result.gestures.append(cur)
-    result.fired = True
-    dut._log.info(
-        f"  {source}: gesture={gesture} "
-        f"({GESTURE_NAMES.get(gesture, '?')}), confidence={confidence}, "
-        f"MISO=0x{int(miso):08X}"
-    )
-    return True
-
 
 async def _gesture_monitor(dut, result):
     """
@@ -1039,17 +1008,43 @@ async def _gesture_monitor(dut, result):
 
 async def _sample_miso_during_drain(dut, pins, result, *, num_samples, gap_cycles):
     """
-    Pin-level alternative to _gesture_monitor for STA GLS.
+    Pin-level alternative to _gesture_monitor for GLS.
 
-    During STA GLS we cannot reliably observe internal gate-level pulse nets, so
-    we poll the SPI-visible classification readback.  The readback value is held
-    until a newer classification is produced, so only transitions are recorded.
+    spi_wrapper latches the most-recent gesture_valid pulse into the SPI
+    readback path, so repeatedly issuing DEBUG_PAGE SPI reads during the
+    drain phase reconstructs the histogram of distinct (gesture, confidence)
+    values the chip emitted — without touching any internal RTL signal that
+    flattens away after synthesis.
+
+    De-duplication: consecutive samples that read the same (gesture,
+    confidence) are merged. spi_wrapper holds the last value until the next
+    gesture_valid pulse, so an unchanged read means no new pulse fired.
     """
+    # spi_wrapper's gesture-readback register resets to (gesture=0, confidence=0).
+    # Until the first real gesture_valid pulse fires, drain samples return that
+    # baseline. Seed prev with it so the dedup loop does not record the
+    # uninitialized state as a spurious (Down,0) pulse. A real classification
+    # should differ from this once confidence becomes valid.
+    prev = (0, 0)
+
     for i in range(num_samples):
         await ClockCycles(dut.clk_PAD, gap_cycles)
         miso = await _spi_xfer(dut, pins, _debug_page(0),
                                 tag=f"drain_miso_{i}")
-        _record_miso_value(dut, result, miso, f"drain MISO sample #{i}")
+        # MISO encoding (see _expected_miso): bit[31]=confidence,
+        # bits[30:29]=gesture.
+        gesture    = (miso >> (DATA_WIDTH - 3)) & 0x3
+        confidence = (miso >> (DATA_WIDTH - 1)) & 0x1
+        cur = (gesture, confidence)
+        if cur == prev:
+            continue
+        result.gestures.append(cur)
+        result.fired = True
+        prev = cur
+        dut._log.info(
+            f"  drain MISO sample #{i}: gesture={gesture} "
+            f"({GESTURE_NAMES.get(gesture, '?')}), confidence={confidence}"
+        )
 
 
 async def _stream_recording(dut, pins, bin_path):
@@ -1102,23 +1097,8 @@ async def _stream_recording(dut, pins, bin_path):
     # Single SPI burst with CS held low for the entire stream — matches how
     # a real GenX320 sensor delivers events: continuous, no CS toggling.
     # inter_gap=4: SPI re-arm needs ≥ 3 chip cycles minimum.
-    miso_words = await _spi_stream(
-        dut, pins, words,
-        inter_gap=4,
-        progress_every=10_000,
-        tag=stem,
-        capture_miso=use_pin_level_monitor,
-    )
-
-    if use_pin_level_monitor:
-        changes = 0
-        for widx, miso in enumerate(miso_words):
-            if _record_miso_value(dut, result, miso, f"stream MISO word #{widx}"):
-                changes += 1
-        dut._log.info(
-            f"STA GLS stream MISO scan: {changes} classification readback "
-            f"transition(s) observed across {len(miso_words)} streamed words"
-        )
+    await _spi_stream(dut, pins, words, inter_gap=4,
+                      progress_every=10_000, tag=stem)
 
     # Drain: 300 000 cycles @ 64 MHz = 4.7 ms. After streaming we have
     # ~READOUT_BINS+2 = 18 flush-driven bin rollovers queued in the binner.
@@ -1143,7 +1123,7 @@ async def _stream_recording(dut, pins, bin_path):
     if not result.gestures:
         raise AssertionError(
             f"No gesture_valid pulses fired after streaming {stem} "
-            f"({total} words) + 300 000 drain cycles"
+            f"({total} words) + 50 000 drain cycles"
         )
 
     # Compute dominant class — voxel_bin_core_tb-style validation.
