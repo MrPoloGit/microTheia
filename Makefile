@@ -164,12 +164,7 @@ lint: ## Lint all SystemVerilog files in src
 	          $(SV_SRCS)
 .PHONY: lint
 
-sim: $(PDK_ROOT)/$(PDK) defines ## Run RTL simulation with cocotb
-	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
-.PHONY: sim
-
-# how we ran old THING ------------------------------------------------------------
-sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
+sim: $(PDK_ROOT)/$(PDK) defines ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	@if [ -z "$(DUT)" ]; then \
 		$(MAKE) sim-chip-top; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
@@ -218,54 +213,17 @@ sim-all: ## Test all the modules against Makefile compile args
 	$(MAKE) sim DUT=voxel_bin_core
 .PHONY: sim-all
 
-SLOT_UPPER    := $(shell echo $(SLOT) | tr 'a-z' 'A-Z')
-CHIP_TOP_SRCS := src/chip_top.sv src/chip_core.sv src/soc.sv src/spi_wrapper.sv \
-    			 src/control_fsm.sv src/evt2_decoder.sv src/sram_wrapper.sv src/input_fifo.sv \
-    			 src/selectable_debug.sv src/voxel_bin_core.sv src/voxel_binning.sv \
-    			 src/voxel_gesture_classifier.sv src/voxel_mac_engine.sv \
-    			 third_party/verilog_spi/spi_module.v third_party/verilog_spi/pos_edge_det.v third_party/verilog_spi/neg_edge_det.v \
-    			 ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v \
-    			 ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
-CHIP_TOP_PDK_IO := $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v
-
-# Use real PDK IO/SRAM models when available, otherwise fall back to behavioral stubs
-CHIP_TOP_IO_SRCS := $(if $(wildcard $(CHIP_TOP_PDK_IO)),\
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v \
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v \
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v,\
-    sim/io_stubs.v)
-
-sim-chip-top: ## Run chip_top RTL simulation with cocotb
-	@echo "IO sources: $(CHIP_TOP_IO_SRCS)"
-	rm -rf cocotb/sim_build/chip_top
-	TOPLEVEL=chip_top \
-	TOPLEVEL_LANG=verilog \
-	COCOTB_TEST_MODULES=chip_top_tb \
-	VERILOG_SOURCES="$(CHIP_TOP_SRCS) $(CHIP_TOP_IO_SRCS)" \
-	COMPILE_ARGS="-DSLOT_$(SLOT_UPPER) -I$(MAKEFILE_DIR)/src" \
-	WAVES=1 \
-	SIM_BUILD=cocotb/sim_build/chip_top \
-	PYTHONPATH=cocotb \
-	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
+sim-chip-top: $(PDK_ROOT)/$(PDK) defines ## Run chip_top RTL simulation with cocotb
+	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-chip-top
-# ------------------------------------------------------------
 
-sim-gl: $(PDK_ROOT)/$(PDK) defines ## Run gate-level simulation with cocotb (after copy-final)
-	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
-.PHONY: sim-gl
-
-sim-view: ## View simulation waveforms in GTKWave
-	gtkwave cocotb/sim_build/chip_top.fst
-.PHONY: sim-view
-
-# How we ran it old THINGS ------------------------------------------------------------
 # Stage-specific GLS netlists from the latest librelane run.
 GL_SYNTH_NETLIST := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/06-yosys-synthesis/chip_top.nl.v
 GL_FP_NETLIST    := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/13-openroad-floorplan/chip_top.pnl.v
 GL_PNR_NETLIST   := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/51-openroad-fillinsertion/chip_top.pnl.v
 
-sim-gl: ## Run post-synthesis gate-level simulation with cocotb (Icarus)
-	cd cocotb; GL=1 GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+sim-gl: $(PDK_ROOT)/$(PDK) defines ## Run gate-level simulation with cocotb (uses final/pnl or latest run netlist)
+	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-gl
 
 sim-gl-verilator: ## Run post-synthesis gate-level simulation with Verilator (faster than Icarus)

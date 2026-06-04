@@ -1558,6 +1558,10 @@ def chip_top_runner():
     proj_path = Path(__file__).resolve().parent
 
     defines = {f"SLOT_{slot.upper()}": True}
+    defines[f"PDK_{pdk.replace('-', '_')}"] = True
+    defines[f"SCL_{scl}"] = True
+    defines[f"PAD_{pad}"] = True
+    defines[f"SRAM_{sram}"] = True
     includes = [proj_path / "../src/"]
 
     if gl:
@@ -1603,7 +1607,7 @@ def chip_top_runner():
         # blocks active, so we must NOT define FUNCTIONAL in that mode.
         # For plain functional GLS the specify blocks add overhead with no
         # benefit, so we keep FUNCTIONAL defined to suppress them.
-        defines = {"functional": True}
+        defines.update({"functional": True})
         if not timing:
             # Functional GLS only: suppress specify blocks for faster compile.
             defines["FUNCTIONAL"] = True
@@ -1655,8 +1659,11 @@ def chip_top_runner():
             sources.append(proj_path / "../sim/io_stubs.v")
 
     sources += [
-        proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
         proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
+        proj_path / "../ip/gf180mcu_ws_ip__marker/vh/gf180mcu_ws_ip__marker.v",
+        proj_path / "../ip/gf180mcu_ws_ip__qrcode_id/vh/gf180mcu_ws_ip__qrcode_id.v",
+        proj_path / "../ip/gf180mcu_ws_ip__shuttle_id/vh/gf180mcu_ws_ip__shuttle_id.v",
+        proj_path / "../ip/gf180mcu_ws_ip__project_id/vh/gf180mcu_ws_ip__project_id.v",
     ]
 
     build_args = []
