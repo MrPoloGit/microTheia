@@ -10,27 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Download Tools
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: false
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            extra-substituters = https://nix-cache.fossi-foundation.org
+            extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
+
+      - name: Build Nix devShell
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-dev
-          pip3 install -r scripts/requirements.txt
-          wget -O - https://raw.githubusercontent.com/sifferman/hdl-tool-installer/main/install | bash -s -- . --oss-cad-suite --zachjs-sv2v
-          echo "$GITHUB_WORKSPACE/oss-cad-suite/bin" >> $GITHUB_PATH
-          echo "$GITHUB_WORKSPACE/zachjs-sv2v" >> $GITHUB_PATH
+          nix build \
+            --no-link \
+            --accept-flake-config \
+            .#devShells.x86_64-linux.default
 
-      # - run: make lint
+      - name: Clone PDK
+        run: |
+          nix develop --accept-flake-config --command make clone-pdk
 
-      - run: make sim DUT=input_fifo
-      - run: make sim DUT=evt2_decoder
-      - run: make sim DUT=voxel_gesture_classifier
-      - run: make sim DUT=voxel_mac_engine
-      - run: make sim DUT=voxel_binning
+      - run: nix develop --accept-flake-config --command make sim DUT=input_fifo
+      - run: nix develop --accept-flake-config --command make sim DUT=evt2_decoder
+      - run: nix develop --accept-flake-config --command make sim DUT=voxel_gesture_classifier
+      - run: nix develop --accept-flake-config --command make sim DUT=voxel_mac_engine
+      - run: nix develop --accept-flake-config --command make sim DUT=voxel_binning
 
-      # - run: make sim DUT=voxel_bin_core # takes to long for GA
+      # - run: nix develop --accept-flake-config --command make sim DUT=voxel_bin_core # takes too long for GA
 
-      - run: make clean
+      - run: nix develop --accept-flake-config --command make clean
