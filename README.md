@@ -1,13 +1,25 @@
 # μTheia
-μTheia is a GF180MCU event-based machine vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16×16 spatial grid, bins events into 16 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports pattern detection for the 4 programmable classes through SPI or selectable physical debug/output pins.
+μTheia is a GF180MCU event-based machine vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16x16 spatial grid, bins events into 16 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports pattern detection for the 4 programmable classes through SPI or selectable physical debug/output pins.
 
 <img width="657" height="855" alt="image" src="https://github.com/user-attachments/assets/28d2bab8-3486-4232-8110-f9bdbcd9f0cf" />
 
 Project uses wafer.space MPW and runs using the gf180mcu PDK.
 
+## Dependencies
+
+### Nix
+
+Too manage all dependencies, the project template includes a Nix shell with all the required tools.
+Install Nix and LibreLane by following the Nix-based installation instructions: https://librelane.readthedocs.io/en/latest/installation/nix_installation/index.html
+To activate the shell, simply run `nix-shell` in the root directory of this repository. The subsequent steps assume that you are in the Nix shell of the project template.
+
+### Docker
+
+Ensure [Docker](https://www.docker.com/) is installed and start a devcontainer. You can also open this repository in a github codespace.
+
 ## Prerequisites and setup
 
-Make sure Git and Git LFS are installed.
+Make sure **Git** and **Git LFS** are installed.
 
 ```bash
 git clone git@github.com:dolphin-530/microTheia.git
@@ -20,14 +32,8 @@ make sim-gl
 make sim-sdf # (like sim-gl but with SDF back-annotated)
 ```
 
-Ensure [Docker](https://www.docker.com/) is installed and start the devcontainer. You can also open this repository in a github codespace.
-
-> [!NOTE]
-> We use a custom fork of the [gf180mcuD PDK variant](https://github.com/wafer-space/gf180mcu) until all changes have been upstreamed.
-
-To clone the latest PDK version, simply run `make clone-pdk`.
-
-In the next step, install LibreLane by following the Nix-based installation instructions: https://librelane.readthedocs.io/en/latest/installation/nix_installation/index.html
+The project uses the open_pdks gf180mcuD variant of the PDK.
+To clone the latest PDK version via [Ciel](https://github.com/fossi-foundation/ciel), run `make clone-pdk`.
 
 ## Implement the Design
 
@@ -110,26 +116,6 @@ make sim-view
 
 You can now update the testbench according to your design.
 
-## Choosing a Different Slot Size
-
-The template supports the following slot sizes: `1x1`, `0p5x1`, `1x0p5`, `0p5x0p5`.
-By default, the design is implemented using the `1x1` slot definition.
-
-To select a different slot size, simply set the `SLOT` environment variable.
-This can be done when invoking a make target:
-
-```bash
-SLOT=0p5x0p5 make librelane
-```
-
-Alternatively, you can export the slot size:
-
-```bash
-export SLOT=0p5x0p5
-```
-
-You can change the slot that is selected by default in the Makefile by editing the value of `DEFAULT_SLOT`.
-
 ## Synthesis for ICE40 FPGA and communicating with it
 
 The current architecture we are using is voxel_bin.
@@ -161,8 +147,6 @@ Once synthesized and having a working bitstream to flash and test, go into the [
 Run `pip install -r scripts/requirements.txt` for RTL simulation, or `pip install -r ice40/requirements.txt` for FPGA tools.
 
 ## Third Party
-- https://github.com/google/globalfoundries-pdk-ip-gf180mcu_fd_ip_sram
-
 This project uses an SPI module from:
 
 - Jan Schiefer, "verilog_spi"
@@ -170,28 +154,81 @@ This project uses an SPI module from:
 
 Licensed under the GNU LGPL v2.1.
 
-The functional change we have made in spi_module.v was adding a non-master fallback in the generate block; previously SCLK_OUT/SS_OUT were only assigned inside if (SPI_MASTER), and now there is an else branch that forces safe defaults when SPI_MASTER == 0 (SCLK_OUT = 1'b0, SS_OUT = 1'b1). There is also clean up and verilator lint flags to reduce lint errors.
+The functional change we have made in spi_module.v was adding a non-master fallback in the generate block; previously SCLK_OUT/SS_OUT were only assigned inside if (SPI_MASTER), and now there is an else branch that forces safe defaults when SPI_MASTER == 0 (SCLK_OUT = 1'b0, SS_OUT = 1'b1). There is also clean up and verilator lint flags to reduce lint errors. The changes are saved to a fork [here](https://github.com/jasonwaseq/verilog_spi).
+
+## Choosing a Different Slot Size
+
+The design utilizes the default slot size of `1x1` however this can be changed, although would require lots of effort and a reduction in scope for the design.
+
+The template supports the following slot sizes: `1x1`, `0p5x1`, `1x0p5`, `0p5x0p5`.
+By default, the design is implemented using the `1x1` slot definition.
+
+To select a different slot size, simply set the `SLOT` environment variable.
+This can be done when invoking a make target:
+
+```bash
+SLOT=0p5x0p5 make librelane
+```
+
+Alternatively, you can export the slot size:
+
+```bash
+export SLOT=0p5x0p5
+```
+
+You can change the slot that is selected by default in the Makefile by editing the value of `DEFAULT_SLOT`.
+
+## Select Different IP Libraries
+
+The project template has support for selecting libraries with the below environment variables:
+
+| Env  | Available Values                                                          | Description                |
+|------|---------------------------------------------------------------------------|----------------------------|
+| SCL  | gf180mcu_fd_sc_mcu7t5v0, gf180mcu_fd_sc_mcu9t5v0, gf180mcu_as_sc_mcu7t3v3 | The standard cell library. |
+| PAD  | gf180mcu_fd_io, gf180mcu_ocd_io                                           | The I/O pad library.       |
+| SRAM | gf180mcu_fd_ip_sram, gf180mcu_ocd_ip_sram                                 | The SRAM library.          |
+
+For example, to build the 0p5x0p5 chip with 3v3 libraries:
+
+```bash
+SLOT=0p5x0p5 SCL=gf180mcu_as_sc_mcu7t3v3 PAD=gf180mcu_ocd_io SRAM=gf180mcu_ocd_ip_sram make librelane
+```
+
+The default values can be changed in the Makefile.
+
+> [!NOTE]
+> Not all of the community-created IPs have been tested yet, so support for them is experimental!
+
+## Building a Standalone Padring for Analog Design
+
+To build just the padring without any standard cell rows, digital routing or filler cells, run the following command:
+
+```bash
+make librelane-padring
+```
+
+It is also possible to build the padring for other slot sizes:
+
+```bash
+SLOT=0p5x0p5 make librelane-padring
+```
 
 ## Precheck
 
-To check whether our design is suitable for manufacturing, run the [gf180mcu-precheck](https://github.com/wafer-space/gf180mcu-precheck) with the layout.
+To check whether the design is suitable for manufacturing, run the [gf180mcu-precheck](https://github.com/wafer-space/gf180mcu-precheck) with the layout.
+
 
 ## Notes
 
-### General
 - For more comprehensive SystemVerilog support, enable the `USE_SLANG` variable in the LibreLane configuration.
-- https://github.com/chipsalliance/chisel-template
 - https://github.com/wafer-space/gf180mcu-project-template
 - https://github.com/VLSIDA/gf180mcu-project-template/tree/3v3-libraries
-- https://github.com/Jilin-Zhang/ASYNC-Chisel
 - https://github.com/jasonwaseq/FPGA-DVS-Gesture-Classifier
 - https://github.com/jasonwaseq/Verilog-Memory-Hardware
 - https://github.com/jasonwaseq/GenX320_STM32F746G-DISCO
 - https://github.com/google/gf180mcu-pdk/
-- [GF180MCU Tutorial - Single Video](https://www.youtube.com/watch?v=USCmZuREMTE)
 - https://github.com/mithro/gf180mcu-sram-forge
 - [Event Camera Clips](https://drive.google.com/drive/folders/1kUSThZpBVr_RSmRtKbDS8sVFCjakwOAj?usp=sharing)
-- https://github.com/gcohen/AMOS-Short-Course
 - https://docs.prophesee.ai/stable/data/encoding_formats/evt2.html
 - https://docs.prophesee.ai/stable/data/encoding_formats/evt3.html
 - https://docs.google.com/spreadsheets/d/1fW5ecBsLSec4hXBMaOjMUHQGslm4y-QUILgrxqS8MpA/edit?gid=0#gid=0
