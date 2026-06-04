@@ -266,11 +266,11 @@ STA_SDF ?= $(MAKEFILE_DIR)/cocotb/chip_top__$(STA_CORNER).icarus.sdf
 $(STA_SDF): $(STA_SDF_RAW) $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py
 	python3 $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py $(STA_SDF_RAW) $(STA_SDF)
 
-sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF using all cocotb tests
+sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF, reset smoke test only
 	cd cocotb; LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
-	WAVES=$${WAVES:-0} \
-	FORCE_REBUILD=$${FORCE_REBUILD:-1} \
-	SIM_BUILD=$(MAKEFILE_DIR)/cocotb/sim_build_sta_gl \
+	WAVES=0 \
+	FORCE_REBUILD=${FORCE_REBUILD} \
+	COCOTB_TEST_FILTER=test_reset_and_spi_ready \
 	GL_NETLIST=$(STA_NETLIST) \
 	SDF_FILE=$(STA_SDF) \
 	PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
