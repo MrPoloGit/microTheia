@@ -1341,6 +1341,44 @@ async def test_diagnostic_pipeline_probe(dut):
         await snapshot(f"after chunk {chunk_idx} ({end} words streamed)")
 
 
+# ── Sanity test (CI-friendly, no LFS required) ────────────────────────────────
+
+@cocotb.test(timeout_time=10, timeout_unit="ms")
+async def test_sanity_evt2_and_debug(dut):
+    """
+    CI sanity check: reset, minimal boot (BOOT_REQ + READS_DONE, no weights),
+    stream 2 synthetic EVT2 words (TIME_HIGH + CD_OFF), sweep debug pages 0-4.
+    No LFS data required — designed for 'make sim' quick-check in GitHub Actions.
+    """
+    pins = await _startup(dut)
+
+    # Minimal boot: BOOT_REQ, wait for the FSM to open the load window, then
+    # READS_DONE.  Skipping weight/threshold loads keeps the test fast and
+    # avoids any dependency on LFS-stored .mem files.
+    dut._log.info("Minimal boot: BOOT_REQ → wait → READS_DONE")
+    await _spi_stream(dut, pins, [_boot_req()], tag="boot_req")
+    await ClockCycles(dut.clk_PAD, _EVT_LD_EN_WAIT_CYCLES)
+    await _spi_stream(dut, pins, [_w_reads_done()], tag="reads_done")
+    await ClockCycles(dut.clk_PAD, 100)
+
+    # 2 synthetic EVT2 words: TIME_HIGH at t_hi=100, then a CD_OFF at (50, 50)
+    time_high_word = (0x8 << 28) | 100             # TYPE=TIME_HIGH, t_hi=100
+    cd_off_word    = (0x0 << 28) | (10 << 22) | (50 << 11) | 50  # ts_lsb=10 x=50 y=50
+    dut._log.info("Streaming 2 synthetic EVT2 words (TIME_HIGH + CD_OFF)...")
+    await _spi_stream(dut, pins, [time_high_word, cd_off_word], tag="evt2_sanity")
+    await ClockCycles(dut.clk_PAD, 200)
+
+    # Sweep debug pages 0-4 and verify the bus is readable
+    dut._log.info("Sweeping debug pages 0-4...")
+    for page in range(5):
+        await _spi_stream(dut, pins, [_debug_page(page)], tag=f"dbg_pg{page}")
+        await ClockCycles(dut.clk_PAD, 20)
+        bus = _read_debug_bus(dut)
+        dut._log.info(f"  Page {page}: debug_bus=0x{bus:08X}")
+
+    dut._log.info("PASS: EVT2 sanity + debug sweep completed")
+
+
 # Runs in both RTL and GLS. The internal-signal monitor used in RTL is
 # replaced by capturing MISO during the stream in GL mode — see
 # _stream_recording. Pin-only observability in GL still validates the full
@@ -1552,9 +1590,9 @@ def chip_top_runner():
             proj_path / "../src/voxel_binning.sv",
             proj_path / "../src/voxel_gesture_classifier.sv",
             proj_path / "../src/voxel_mac_engine.sv",
-            proj_path / "../src/verilog_spi/spi_module.v",
-            proj_path / "../src/verilog_spi/pos_edge_det.v",
-            proj_path / "../src/verilog_spi/neg_edge_det.v",
+            proj_path / "../third_party/verilog_spi/spi_module.v",
+            proj_path / "../third_party/verilog_spi/pos_edge_det.v",
+            proj_path / "../third_party/verilog_spi/neg_edge_det.v",
         ]
 
         # IO pad and SRAM models: use real PDK files when available, otherwise
