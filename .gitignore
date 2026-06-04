@@ -46,6 +46,7 @@ Thumbs.db
 
 # cocotb
 cocotb/*.sdf
+cocotb/sdf/
 cocotb/*.txt
 
 # Parallel GLS run artifacts (one set per gesture)
