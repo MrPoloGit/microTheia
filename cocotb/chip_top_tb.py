@@ -1630,9 +1630,9 @@ def chip_top_runner():
             proj_path / "../src/voxel_binning.sv",
             proj_path / "../src/voxel_gesture_classifier.sv",
             proj_path / "../src/voxel_mac_engine.sv",
-            proj_path / "../src/verilog_spi/spi_module.v",
-            proj_path / "../src/verilog_spi/pos_edge_det.v",
-            proj_path / "../src/verilog_spi/neg_edge_det.v",
+            proj_path / "../third_party/verilog_spi/spi_module.v",
+            proj_path / "../third_party/verilog_spi/pos_edge_det.v",
+            proj_path / "../third_party/verilog_spi/neg_edge_det.v",
         ]
 
         # IO pad and SRAM models: use real PDK files when available, otherwise
