@@ -29,7 +29,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, NextTimeStep, RisingEdge
+from cocotb.triggers import ClockCycles, FallingEdge, NextTimeStep, RisingEdge
 
 # ── Environment ───────────────────────────────────────────────────────────────
 sim      = os.getenv("SIM",  "icarus")
@@ -132,6 +132,19 @@ class InputPins:
         dut.input_PAD.value = self._v
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
+
+async def _drive_spi_pins(dut, pins):
+    """Apply external SPI pin changes away from clk_PAD's sampling edge.
+
+    Timed GLS annotates delay on both clk_PAD and input_PAD paths. If the
+    testbench changes SCLK/MOSI/CS immediately after a rising clk_PAD edge, the
+    delayed core clock can see those inputs move inside the same active edge.
+    Driving on the falling edge gives the pad-delayed signals half a chip cycle
+    of setup before the next rising edge while preserving the SPI bit rate.
+    """
+    await FallingEdge(dut.clk_PAD)
+    pins.drive(dut)
+
 
 async def _start_clock(dut):
     cocotb.start_soon(Clock(dut.clk_PAD, CHIP_PERIOD_PS, "ps").start())
@@ -256,14 +269,14 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     pins.set(p_cs,   1)
     pins.set(p_sclk, 0)
     pins.set(p_mosi, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     # Pre-load MSB of first word, then assert CS
     first = int(words[0]) & 0xFFFFFFFF
     pins.set(p_mosi, (first >> (DATA_WIDTH - 1)) & 1)
     pins.set(p_cs, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     for widx, word in enumerate(words):
@@ -274,7 +287,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
         for bit in range(DATA_WIDTH):
             # Rising SCLK — slave samples MOSI here
             pins.set(p_sclk, 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
             # Sample MISO while SCLK is high
@@ -285,7 +298,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
             pins.set(p_sclk, 0)
             if bit < DATA_WIDTH - 1:
                 pins.set(p_mosi, (word >> (DATA_WIDTH - 2 - bit)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
         if capture_miso:
@@ -296,7 +309,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
         if widx < len(words) - 1:
             nxt = int(words[widx + 1]) & 0xFFFFFFFF
             pins.set(p_mosi, (nxt >> (DATA_WIDTH - 1)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
 
         if progress_every and (widx + 1) % progress_every == 0:
             dut._log.info(f"{tag}: streamed {widx + 1}/{len(words)} words "
@@ -306,7 +319,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     await ClockCycles(dut.clk_PAD, 4)
     pins.set(p_cs, 1)
     pins.set(p_sclk, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 8)
 
     dut._log.info(f"{tag}: done ({len(words)} words)")
@@ -707,38 +720,22 @@ def _resolve_handle(dut, path):
     Works for:
       RTL: dut.i_chip_core.u_soc.gesture_valid
       GL : dut["\\i_chip_core.u_soc.gesture_valid "]
-      STA wrapper: dut.<chip_top_instance>["\\i_chip_core.u_soc.gesture_valid "]
+      STA wrapper: dut.u_chip_top["\\i_chip_core.u_soc.gesture_valid "]
     """
 
-    # Try direct RTL hierarchy from current dut
-    try:
-        obj = dut
-        for part in path.split("."):
-            obj = getattr(obj, part)
-        _ = int(obj.value)
-        return obj
-    except Exception:
-        pass
+    def _scopes():
+        yield dut
+        # STA SDF wrapper case: chip_top is one level below the wrapper.
+        for child_name in ("u_chip_top", "chip_top", "uut", "u_dut", "dut"):
+            try:
+                yield getattr(dut, child_name)
+            except Exception:
+                continue
 
-    # Try escaped GL names directly under current dut
-    for name in (f"\\{path} ", f"\\{path}"):
+    for scope in _scopes():
+        # Try direct RTL hierarchy from this scope.
         try:
-            h = dut[name]
-            _ = int(h.value)
-            return h
-        except Exception:
-            pass
-
-    # STA SDF wrapper case: chip_top is one level below the wrapper
-    for child_name in ("chip_top", "uut", "u_dut", "dut", "u_chip_top"):
-        try:
-            child = getattr(dut, child_name)
-        except Exception:
-            continue
-
-        # Try RTL-like hierarchy under child
-        try:
-            obj = child
+            obj = scope
             for part in path.split("."):
                 obj = getattr(obj, part)
             _ = int(obj.value)
@@ -746,10 +743,10 @@ def _resolve_handle(dut, path):
         except Exception:
             pass
 
-        # Try escaped GL names under child
+        # Try escaped GL names in this scope.
         for name in (f"\\{path} ", f"\\{path}"):
             try:
-                h = child[name]
+                h = scope[name]
                 _ = int(h.value)
                 return h
             except Exception:
@@ -769,18 +766,29 @@ def _resolve_bus_handles(dut, path, width):
     h = _resolve_handle(dut, path)
     if h is not None:
         return [h]   # single multi-bit handle; caller can read .value directly
+    def _scopes():
+        yield dut
+        for child_name in ("u_chip_top", "chip_top", "uut", "u_dut", "dut"):
+            try:
+                yield getattr(dut, child_name)
+            except Exception:
+                continue
+
     # GL form: per-bit handles
     bits = []
     for i in range(width):
         b = None
-        for name in (f"\\{path}[{i}] ", f"\\{path}[{i}]"):
-            try:
-                hb = dut[name]
-                _ = int(hb.value)
-                b = hb
+        for scope in _scopes():
+            for name in (f"\\{path}[{i}] ", f"\\{path}[{i}]"):
+                try:
+                    hb = scope[name]
+                    _ = int(hb.value)
+                    b = hb
+                    break
+                except Exception:
+                    continue
+            if b is not None:
                 break
-            except Exception:
-                continue
         if b is None:
             return None
         bits.append(b)
@@ -1089,10 +1097,10 @@ async def _stream_recording(dut, pins, bin_path):
 
     result = _GestureResult()
 
-    # Regular RTL / non-STA GLS can use the internal gesture_valid monitor.
-    # STA GLS uses chip_top_sdf_wrapper, so internal gate-level signal paths
-    # are harder to resolve. For STA GLS, use the SPI-visible debug readback
-    # path instead.
+    # Use the gesture_valid pulse monitor whenever the simulator exposes the
+    # net. Timed STA wraps chip_top in chip_top_sdf_wrapper.u_chip_top, which
+    # _resolve_handle handles. The older SPI-readback fallback is ambiguous for
+    # Down with confidence=0 because that is also the reset readback value.
     use_pin_level_monitor = False
 
     if use_pin_level_monitor:
@@ -1577,9 +1585,9 @@ def chip_top_runner():
             proj_path / "../src/voxel_binning.sv",
             proj_path / "../src/voxel_gesture_classifier.sv",
             proj_path / "../src/voxel_mac_engine.sv",
-            proj_path / "../src/verilog_spi/spi_module.v",
-            proj_path / "../src/verilog_spi/pos_edge_det.v",
-            proj_path / "../src/verilog_spi/neg_edge_det.v",
+            proj_path / "../third_party/verilog_spi/spi_module.v",
+            proj_path / "../third_party/verilog_spi/pos_edge_det.v",
+            proj_path / "../third_party/verilog_spi/neg_edge_det.v",
         ]
 
         # IO pad and SRAM models: use real PDK files when available, otherwise

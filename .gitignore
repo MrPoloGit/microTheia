@@ -54,4 +54,5 @@ target/
 
 # cocotb
 cocotb/*.sdf
+cocotb/sdf/
 cocotb/*.txt
