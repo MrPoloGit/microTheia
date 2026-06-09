@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 """
 visualize aedat files
 added "realtime" setting for smooth playback

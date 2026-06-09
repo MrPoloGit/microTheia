@@ -149,7 +149,7 @@ Both thresholds are signed comparisons, which allows negative bias (always suppr
 
 ### 9. Debug Infrastructure (`selectable_debug`)
 
-All 32-bit debug signals are latched behind flops to break long combinational paths. An EVT2 `DEBUG_PAGE` command selects one of 11 pages at runtime; see [`debug_mux_pinout.txt`](../debug_mux_pinout.txt) for per-bit assignments.
+All 32-bit debug signals are latched behind flops to break long combinational paths. An EVT2 `DEBUG_PAGE` command selects one of 11 pages at runtime; see [`debug_mux_pinout.txt`](debug_mux_pinout.txt) for per-bit assignments.
 
 ---
 

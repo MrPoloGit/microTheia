@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer

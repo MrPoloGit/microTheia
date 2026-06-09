@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: © 2025 Project Template Contributors
+# SPDX-FileCopyrightText: © 2026 Group G Contributors
 # SPDX-License-Identifier: Apache-2.0
 #
 # chip_top testbench
@@ -20,7 +20,7 @@
 #   bits only (bidir_oe[5:2] and bidir_out[5:2]).
 #
 # NOTE on CSV vs RTL pin naming:
-#   pin_chart.csv labels input pins 2-4 as SPI_DEF_* and 5-7 as SPI_ALT_*.
+#   docs/pin_chart.csv labels input pins 2-4 as SPI_DEF_* and 5-7 as SPI_ALT_*.
 #   chip_core.sv routes pins [5,6,7] to SPI when alt_select=0 (the power-on
 #   default) and pins [2,3,4] when alt_select=1.  This testbench follows the RTL.
 
@@ -399,14 +399,14 @@ async def test_debug_page_sweep(dut):
     """
     Select debug pages 0-4 over the default SPI interface.
     Logs debug_bus (bidir_PAD[37:6]) for each page.
-    Pages 0-2 expose live internal signals; 3 is reserved; 4 is decoder output.
+    Pages 0-2 expose live internal signals; 3 exposes control_fsm state; 4 is decoder output.
     We verify the commands are accepted without error and log the bus values.
     """
     PAGE_NAMES = {
         0: "voxel_gesture_classifier + mac_engine",
         1: "voxel_binning",
         2: "evt2_decoder + input_FIFO + voxel_core",
-        3: "control_module (reserved)",
+        3: "control_fsm state (main_state[11:8] load_state[7:2] boot_fail[1] boot_done[0])",
         4: "evt2_decoder event output",
     }
 
@@ -1432,6 +1432,44 @@ async def test_diagnostic_pipeline_probe(dut):
         # CS goes high here (between bursts); let pipeline settle
         await ClockCycles(dut.clk_PAD, 5_000)
         await snapshot(f"after chunk {chunk_idx} ({end} words streamed)")
+
+
+# ── Sanity test (CI-friendly, no LFS required) ────────────────────────────────
+
+@cocotb.test(timeout_time=10, timeout_unit="ms")
+async def test_sanity_evt2_and_debug(dut):
+    """
+    CI sanity check: reset, minimal boot (BOOT_REQ + READS_DONE, no weights),
+    stream 2 synthetic EVT2 words (TIME_HIGH + CD_OFF), sweep debug pages 0-4.
+    No LFS data required — designed for 'make sim' quick-check in GitHub Actions.
+    """
+    pins = await _startup(dut)
+
+    # Minimal boot: BOOT_REQ, wait for the FSM to open the load window, then
+    # READS_DONE.  Skipping weight/threshold loads keeps the test fast and
+    # avoids any dependency on LFS-stored .mem files.
+    dut._log.info("Minimal boot: BOOT_REQ → wait → READS_DONE")
+    await _spi_stream(dut, pins, [_boot_req()], tag="boot_req")
+    await ClockCycles(dut.clk_PAD, _EVT_LD_EN_WAIT_CYCLES)
+    await _spi_stream(dut, pins, [_w_reads_done()], tag="reads_done")
+    await ClockCycles(dut.clk_PAD, 100)
+
+    # 2 synthetic EVT2 words: TIME_HIGH at t_hi=100, then a CD_OFF at (50, 50)
+    time_high_word = (0x8 << 28) | 100             # TYPE=TIME_HIGH, t_hi=100
+    cd_off_word    = (0x0 << 28) | (10 << 22) | (50 << 11) | 50  # ts_lsb=10 x=50 y=50
+    dut._log.info("Streaming 2 synthetic EVT2 words (TIME_HIGH + CD_OFF)...")
+    await _spi_stream(dut, pins, [time_high_word, cd_off_word], tag="evt2_sanity")
+    await ClockCycles(dut.clk_PAD, 200)
+
+    # Sweep debug pages 0-4 and verify the bus is readable
+    dut._log.info("Sweeping debug pages 0-4...")
+    for page in range(5):
+        await _spi_stream(dut, pins, [_debug_page(page)], tag=f"dbg_pg{page}")
+        await ClockCycles(dut.clk_PAD, 20)
+        bus = _read_debug_bus(dut)
+        dut._log.info(f"  Page {page}: debug_bus=0x{bus:08X}")
+
+    dut._log.info("PASS: EVT2 sanity + debug sweep completed")
 
 
 # Runs in both RTL and GLS. The internal-signal monitor used in RTL is

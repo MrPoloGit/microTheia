@@ -110,9 +110,13 @@ bit index       description
 30              debug_capture_active
 31              debug_score_busy
 
-PAGE 3 (debug_select = 4'b0011): reserved for control module debug signals
+PAGE 3 (debug_select = 4'b0011): control_fsm state
 bit index       description
-[31:0]          reserved        
+[11:8]          main_state_dbg_o[3:0]   (ST_BOOT=0, ST_LOAD=1, ST_RUN=2, ST_DEBUG=3)
+[7:2]           load_state_dbg_o[5:0]   (LD_IDLE=0, LD_WAIT_PWR=1, LD_OPEN=2, LD_WAIT=3, LD_DONE=4, LD_FAIL=5)
+[1]             boot_fail_o
+[0]             boot_done_o
+[31:12]         tied to ground
 
 PAGE 4 (debug_select = 4'b0100): evt2_decoder event output
 bit index       description

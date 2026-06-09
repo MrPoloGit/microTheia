@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 """
 Patch an OpenROAD-emitted SDF so Icarus Verilog 13 can consume it without
 fatal errors or VPI assertion crashes.

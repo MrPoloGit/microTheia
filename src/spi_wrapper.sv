@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 `default_nettype none
 //just the spi module and control logic from soc.sv
 //purpose is to enable testing of the spi interface independent of voxel_bin_core

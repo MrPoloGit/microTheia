@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 """
 EVT2 real-time visualizer for aligned.bin (uint32 stream).
 

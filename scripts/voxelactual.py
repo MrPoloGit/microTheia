@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 #run this file through the command ./voxelactual input.txt
 
 import numpy as np 

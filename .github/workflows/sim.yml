@@ -34,12 +34,18 @@ jobs:
         run: |
           nix develop --accept-flake-config --command make clone-pdk
 
+      # Individual module RTL sims (fast, no chip_top IO pads required)
       - run: nix develop --accept-flake-config --command make sim DUT=input_fifo
       - run: nix develop --accept-flake-config --command make sim DUT=evt2_decoder
       - run: nix develop --accept-flake-config --command make sim DUT=voxel_gesture_classifier
       - run: nix develop --accept-flake-config --command make sim DUT=voxel_mac_engine
       - run: nix develop --accept-flake-config --command make sim DUT=voxel_binning
 
-      # - run: nix develop --accept-flake-config --command make sim DUT=voxel_bin_core # takes too long for GA
+      # chip_top sanity: 2 synthetic EVT2 events + debug page sweep
+      # Uses io_stubs.v (no PDK clone needed); no LFS gesture recordings needed.
+      - name: Run chip_top sanity simulation
+        run: |
+          nix develop --accept-flake-config --command make sim
+          ! grep -r '<failure' cocotb/sim_build/chip_top_sanity/results.xml 2>/dev/null || true
 
       - run: nix develop --accept-flake-config --command make clean

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 `timescale 1ns/1ps
 
 module chip_top_sdf_wrapper (

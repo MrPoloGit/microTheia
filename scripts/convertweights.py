@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 def process_mem_file(input_file, output_file):
     with open(input_file, "r") as infile, open(output_file, "w") as outfile:
         for line_num, line in enumerate(infile, start=1):
