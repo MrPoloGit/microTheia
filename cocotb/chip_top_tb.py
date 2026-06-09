@@ -29,7 +29,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, NextTimeStep, RisingEdge
+from cocotb.triggers import ClockCycles, FallingEdge, NextTimeStep, RisingEdge
 
 # ── Environment ───────────────────────────────────────────────────────────────
 sim      = os.getenv("SIM",  "icarus")
@@ -132,6 +132,19 @@ class InputPins:
         dut.input_PAD.value = self._v
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
+
+async def _drive_spi_pins(dut, pins):
+    """Apply external SPI pin changes away from clk_PAD's sampling edge.
+
+    Timed GLS annotates delay on both clk_PAD and input_PAD paths. If the
+    testbench changes SCLK/MOSI/CS immediately after a rising clk_PAD edge, the
+    delayed core clock can see those inputs move inside the same active edge.
+    Driving on the falling edge gives the pad-delayed signals half a chip cycle
+    of setup before the next rising edge while preserving the SPI bit rate.
+    """
+    await FallingEdge(dut.clk_PAD)
+    pins.drive(dut)
+
 
 async def _start_clock(dut):
     cocotb.start_soon(Clock(dut.clk_PAD, CHIP_PERIOD_PS, "ps").start())
@@ -256,14 +269,14 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     pins.set(p_cs,   1)
     pins.set(p_sclk, 0)
     pins.set(p_mosi, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     # Pre-load MSB of first word, then assert CS
     first = int(words[0]) & 0xFFFFFFFF
     pins.set(p_mosi, (first >> (DATA_WIDTH - 1)) & 1)
     pins.set(p_cs, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     for widx, word in enumerate(words):
@@ -274,7 +287,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
         for bit in range(DATA_WIDTH):
             # Rising SCLK — slave samples MOSI here
             pins.set(p_sclk, 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
             # Sample MISO while SCLK is high
@@ -285,7 +298,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
             pins.set(p_sclk, 0)
             if bit < DATA_WIDTH - 1:
                 pins.set(p_mosi, (word >> (DATA_WIDTH - 2 - bit)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
         if capture_miso:
@@ -296,7 +309,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
         if widx < len(words) - 1:
             nxt = int(words[widx + 1]) & 0xFFFFFFFF
             pins.set(p_mosi, (nxt >> (DATA_WIDTH - 1)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
 
         if progress_every and (widx + 1) % progress_every == 0:
             dut._log.info(f"{tag}: streamed {widx + 1}/{len(words)} words "
@@ -306,7 +319,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     await ClockCycles(dut.clk_PAD, 4)
     pins.set(p_cs, 1)
     pins.set(p_sclk, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 8)
 
     dut._log.info(f"{tag}: done ({len(words)} words)")
@@ -364,14 +377,14 @@ async def test_debug_page_sweep(dut):
     """
     Select debug pages 0-4 over the default SPI interface.
     Logs debug_bus (bidir_PAD[37:6]) for each page.
-    Pages 0-2 expose live internal signals; 3 is reserved; 4 is decoder output.
+    Pages 0-2 expose live internal signals; 3 exposes control_fsm state; 4 is decoder output.
     We verify the commands are accepted without error and log the bus values.
     """
     PAGE_NAMES = {
         0: "voxel_gesture_classifier + mac_engine",
         1: "voxel_binning",
         2: "evt2_decoder + input_FIFO + voxel_core",
-        3: "control_module (reserved)",
+        3: "control_fsm state (main_state[11:8] load_state[7:2] boot_fail[1] boot_done[0])",
         4: "evt2_decoder event output",
     }
 

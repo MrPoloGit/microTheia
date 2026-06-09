@@ -139,8 +139,11 @@ bit index       description
 
 PAGE 3 (debug_select = 4'b0011): FSM debug
 bit index       description
-[11:0]          fsm_debug_bus  ->    main_state_dbg_o [11:6] load_state_dbg_o [5:2] boot_fail_o [1] boot_done_o [0]
-[31:12]         reserved
+[11:8]          main_state_dbg_o[3:0]   (ST_BOOT=0, ST_LOAD=1, ST_RUN=2, ST_DEBUG=3)
+[7:2]           load_state_dbg_o[5:0]   (LD_IDLE=0, LD_WAIT_PWR=1, LD_OPEN=2, LD_WAIT=3, LD_DONE=4, LD_FAIL=5)
+[1]             boot_fail_o
+[0]             boot_done_o
+[31:12]         tied to ground
 
 PAGE 4 (debug_select = 4'b0100): evt2_decoder event output
 bit index       description
