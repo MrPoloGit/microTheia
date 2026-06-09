@@ -2,3 +2,4 @@ numpy==2.4.3
 opencv-python==4.13.0.92
 matplotlib==3.10.8
 cocotb==2.0.1
+cocotb-tools

@@ -104,11 +104,11 @@ lint: ## Lint all SystemVerilog files in src
 	          $(SV_SRCS)
 .PHONY: lint
 
-sim: ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
+sim: ## Run RTL simulation (no DUT or DUT=chip_top → chip_top sanity check; else run named DUT)
 	@if [ -z "$(DUT)" ]; then \
-		$(MAKE) sim-chip-top; \
+		$(MAKE) sim-chip-top-sanity; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
-		$(MAKE) sim-chip-top; \
+		$(MAKE) sim-chip-top-sanity; \
 	else \
 		for d in $(SIM_DUTS); do \
 			echo "===================================================="; \
@@ -166,7 +166,7 @@ CHIP_TOP_IO_SRCS := $(if $(wildcard $(CHIP_TOP_PDK_IO)),\
     $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v,\
     sim/io_stubs.v)
 
-sim-chip-top: ## Run chip_top RTL simulation with cocotb
+sim-chip-top: ## Run full chip_top RTL simulation (all tests, including classify)
 	@echo "IO sources: $(CHIP_TOP_IO_SRCS)"
 	rm -rf cocotb/sim_build/chip_top
 	TOPLEVEL=chip_top \
@@ -179,6 +179,21 @@ sim-chip-top: ## Run chip_top RTL simulation with cocotb
 	PYTHONPATH=cocotb \
 	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
 .PHONY: sim-chip-top
+
+sim-chip-top-sanity: ## Quick chip_top sanity: 2 EVT2 events + debug sweep (no LFS, CI-friendly)
+	@echo "IO sources: $(CHIP_TOP_IO_SRCS)"
+	rm -rf cocotb/sim_build/chip_top_sanity
+	TOPLEVEL=chip_top \
+	TOPLEVEL_LANG=verilog \
+	COCOTB_TEST_MODULES=chip_top_tb \
+	COCOTB_TEST_FILTER=test_sanity_evt2_and_debug \
+	VERILOG_SOURCES="$(CHIP_TOP_SRCS) $(CHIP_TOP_IO_SRCS)" \
+	COMPILE_ARGS="-DSLOT_$(SLOT_UPPER) -I$(MAKEFILE_DIR)/src" \
+	WAVES=0 \
+	SIM_BUILD=cocotb/sim_build/chip_top_sanity \
+	PYTHONPATH=cocotb \
+	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
+.PHONY: sim-chip-top-sanity
 
 # Stage-specific GLS netlists from the latest librelane run.
 GL_SYNTH_NETLIST := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/06-yosys-synthesis/chip_top.nl.v
