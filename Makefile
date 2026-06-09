@@ -76,9 +76,6 @@ SV_SRCS := $(shell find src -name "*.sv")
 CONFIG ?= voxel_default
 CONFIG_FILE := configs/$(CONFIG).txt
 
-# iCE40 FPGA Flow Wrapper
-ICE40_MAKEFILE := ice40/ice40.mk
-
 # Default testbench module name is <DUT>_tb, but you can override it:
 # Example: make sim DUT=voxel_bin_core_parallel TB=voxel_bin_core
 TB ?= $(DUT)
@@ -353,18 +350,6 @@ render-image: ## Render an image from the final layout (after copy-final)
 	mkdir -p img/
 	PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/lay2img.py final/gds/${TOP}.gds img/${TOP}.png --width 2048 --oversampling 4
 .PHONY: render-image
-
-ice40: ## Run ice40 FPGA build
-	$(MAKE) -C ice40 -f ice40.mk ARCH=$(ARCH)
-
-ice40-prog: ## Program ice40 board
-	$(MAKE) -C ice40 -f ice40.mk prog ARCH=$(ARCH)
-
-ice40-timing: ## Timing report for ice40 build
-	$(MAKE) -C ice40 -f ice40.mk timing ARCH=$(ARCH)
-
-ice40-clean: ## Cleans out all ice40 logic
-	$(MAKE) -C ice40 -f ice40.mk clean
 
 clean: ## Cleans the generated files
 	rm -rf results.xml sim_build/
