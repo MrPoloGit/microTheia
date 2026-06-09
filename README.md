@@ -5,29 +5,54 @@
 
 Project uses wafer.space MPW and runs using the gf180mcu PDK.
 
+## Documentation
+
+Full technical documentation is in the [`docs/`](docs/) directory:
+
+| Document | Contents |
+|----------|----------|
+| [`docs/architecture.md`](docs/architecture.md) | System architecture, block diagram, pipeline stages, memory map, control flow |
+| [`docs/rtl_reference.md`](docs/rtl_reference.md) | Per-module RTL reference: ports, parameters, behavior, timing |
+| [`docs/simulation.md`](docs/simulation.md) | cocotb testbenches, utility functions, configuration files, waveform viewing |
+| [`docs/limitations.md`](docs/limitations.md) | Known limitations, things that don't work, results, and future improvements |
+
+The [`debug_mux_pinout.txt`](debug_mux_pinout.txt) file documents per-bit assignments for all 11 debug bus pages.
+
+## Caveats
+
+> [!IMPORTANT]
+> Read these before running the project for the first time.
+
+- **Nix/OpenROAD first-run compile time.** The `flake.nix` environment compiles OpenROAD from source (the `leo/gf180mcu` branch) on first `nix-shell` invocation. This takes **30–90 minutes** depending on CPU speed. The result is cached locally; subsequent shells start in seconds.
+
+- **Gate-level simulation is slow.** `make sim-gl` takes approximately **7 hours** on a modern workstation. `make sim-gl-parallel` runs four gesture tests simultaneously, ensure adequate RAM and CPU cores before starting.
+
+- **Waveform file size.** GL simulation FST files can reach **tens of gigabytes**. Ensure at least 50 GB of free disk space before running gate-level or chip-top RTL simulations.
+
+- **Weight loading is required before inference.** After every power cycle the chip starts in `BOOT` state and will not classify events until a full weight/threshold load completes (`BOOT_REQ` → weight commands → `EVT_READS_DONE`). If the SPI master loses sync during loading, restart the load from the beginning.
+
+- **`make sim` requires `DUT=`.** Running `make sim` without `DUT=<module_name>` will result in the simple sanity check being ran for `chip_top_tb.py`. Always specify the module, e.g. `make sim DUT=voxel_bin_core`.
+
+- **PDK must be cloned before simulation.** Run `make config-pdk` once to download the GF180MCU PDK and everything else. Simulation will fail without it because the SRAM behavioral models live in the PDK.
+
+- **SDF back-annotation is not fully working.** `make sim-sdf` is provided but timing-accurate simulation is unreliable, the Verilog timing models for GF180MCU SRAMs are not consistently present in the open PDK distribution, and Icarus will silently fall back to zero-delay functional simulation.
+
 ## Prerequisites and setup
 
-Make sure Git and Git LFS are installed.
+Make sure Git, Git LFS, and NIX are installed.
 
 ```bash
 git clone git@github.com:dolphin-530/microTheia.git
 cd microTheia
-make config-pdk
 nix-shell
+make config-pdk
 make sim
 make librelane
 make sim-gl
 make sim-sdf # (like sim-gl but with SDF back-annotated)
 ```
 
-Ensure [Docker](https://www.docker.com/) is installed and start the devcontainer. You can also open this repository in a github codespace.
-
-> [!NOTE]
-> We use a custom fork of the [gf180mcuD PDK variant](https://github.com/wafer-space/gf180mcu) until all changes have been upstreamed.
-
-To clone the latest PDK version, simply run `make clone-pdk`.
-
-In the next step, install LibreLane by following the Nix-based installation instructions: https://librelane.readthedocs.io/en/latest/installation/nix_installation/index.html
+If you want to use [Docker](https://www.docker.com/), ensure it is installed and start the devcontainer. You can also open this repository in a github codespace. Docker will not work with the full librelane flow, and only works for basic simulation.
 
 ## Implement the Design
 
@@ -35,13 +60,9 @@ This repository contains a Nix flake that provides a shell with the [`leo/gf180m
 
 Simply run 
 ```bash
-export NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-25.05.tar.gz
 nix-shell
 ```
 in the root of this repository.
-
-> [!NOTE]
-> Since we are working on a branch of LibreLane, OpenROAD needs to be compiled locally. This will be done automatically by Nix, and the binary will be cached locally. 
 
 With this shell enabled, run the implementation:
 
@@ -84,7 +105,7 @@ The testbenchs are located in `cocotb`. To run the RTL simulation, run the follo
 make sim DUT=module_name CONFIG=config_name
 ```
 
-If DUT isn't provided it fails, if CONFIG isn't provided it will default to the compile arguments in the Makefile. Configs are stored in the configs folder.
+If DUT isn't provided it runs the basic sanity check for `chip_top`, if CONFIG isn't provided it will default to the compile arguments in the Makefile. Configs are stored in the configs folder.
 
 To simulate all, run
 
@@ -112,8 +133,7 @@ You can now update the testbench according to your design.
 
 ## Choosing a Different Slot Size
 
-The template supports the following slot sizes: `1x1`, `0p5x1`, `1x0p5`, `0p5x0p5`.
-By default, the design is implemented using the `1x1` slot definition.
+We are using `1x1` slot however the template supports the following slot sizes: `1x1`, `0p5x1`, `1x0p5`, `0p5x0p5`.
 
 To select a different slot size, simply set the `SLOT` environment variable.
 This can be done when invoking a make target:
@@ -130,19 +150,6 @@ export SLOT=0p5x0p5
 
 You can change the slot that is selected by default in the Makefile by editing the value of `DEFAULT_SLOT`.
 
-## Synthesis for ICE40 FPGA and communicating with it
-
-The current architecture we are using is voxel_bin.
-
-```bash
-make ice40 ARCH=architecture     # Run iCE40 FPGA build
-make ice40-prog                  # Program iCE40 board
-make ice40-timing                # Timing report for iCE40 build
-make ice40-clean                 # Cleans out all ice40 logic
-```
-
-Once synthesized and having a working bitstream to flash and test, go into the [`ice40`](ice40/README.md) folder.
-
 ## Tool Versions
 
 | Tool | Version | Source |
@@ -158,10 +165,9 @@ Once synthesized and having a working bitstream to flash and test, go into the [
 | cocotb | 2.0.1 | Dockerfile, scripts/requirements.txt |
 | pyserial | 3.5 | Dockerfile, ice40/requirements.txt |
 
-Run `pip install -r scripts/requirements.txt` for RTL simulation, or `pip install -r ice40/requirements.txt` for FPGA tools.
+Run `pip install -r scripts/requirements.txt` for RTL simulation.
 
 ## Third Party
-- https://github.com/google/globalfoundries-pdk-ip-gf180mcu_fd_ip_sram
 
 This project uses an SPI module from:
 
@@ -178,7 +184,6 @@ To check whether our design is suitable for manufacturing, run the [gf180mcu-pre
 
 ## Notes
 
-### General
 - For more comprehensive SystemVerilog support, enable the `USE_SLANG` variable in the LibreLane configuration.
 - https://github.com/chipsalliance/chisel-template
 - https://github.com/wafer-space/gf180mcu-project-template
