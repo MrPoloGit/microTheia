@@ -39,7 +39,7 @@ Bridges pad signals to the internal SOC, implements pin multiplexing for the dua
 | `debug_bus[31:0]` | Forwarded from `soc` to `bidir[6:37]`. |
 | `MISO` | Routed to `bidir[38]` or `bidir[39]` depending on `ALT_INPUT_MODE`; unused MISO pad held via pull-down. |
 
-**Pin Assignments (1×1 slot default)**
+**Pin Assignments (1x1 slot default)**
 
 | Input Pad | Default Function | Alt Function |
 |-----------|-----------------|--------------|
@@ -63,12 +63,12 @@ Instantiates `spi_wrapper` and `voxel_bin_core`, connecting them via the EVT2 wo
 **Connections**
 
 ```
-spi_wrapper.evt_word      → voxel_bin_core.evt_word_i
-spi_wrapper.evt_word_valid → voxel_bin_core.evt_word_valid_i
-voxel_bin_core.evt_word_ready_o → spi_wrapper.evt_word_ready
-voxel_bin_core.gesture_o        → spi_wrapper.gesture
-voxel_bin_core.gesture_valid_o  → spi_wrapper.gesture_valid
-voxel_bin_core.gesture_confidence_o → spi_wrapper.gesture_confidence
+spi_wrapper.evt_word                -> voxel_bin_core.evt_word_i
+spi_wrapper.evt_word_valid          -> voxel_bin_core.evt_word_valid_i
+voxel_bin_core.evt_word_ready_o     -> spi_wrapper.evt_word_ready
+voxel_bin_core.gesture_o            -> spi_wrapper.gesture
+voxel_bin_core.gesture_valid_o      -> spi_wrapper.gesture_valid
+voxel_bin_core.gesture_confidence_o -> spi_wrapper.gesture_confidence
 ```
 
 ---
@@ -110,7 +110,7 @@ Decodes 32-bit EVT2 words into typed events and control commands.
 |-----------|---------|-------------|
 | `SENSOR_WIDTH` | 320 | DVS sensor X resolution |
 | `SENSOR_HEIGHT` | 320 | DVS sensor Y resolution |
-| `FEATURE_COUNT` | 4096 | GRID_SIZE² × READOUT_BINS |
+| `FEATURE_COUNT` | 4096 | GRID_SIZE^2 x READOUT_BINS |
 | `GRID_SIZE` | 16 | Spatial grid N |
 | `SCORE_BITS` | 37 | Score accumulator width |
 | `WEIGHT_BITS` | 8 | Weight width |
@@ -256,7 +256,7 @@ Top-level module integrating all inference stages. Instantiates:
 - `evt2_decoder`
 - `voxel_binning`
 - Feature RAM (`sram_wrapper`)
-- Weight SRAMs × NUM_CLASSES (`sram_wrapper`)
+- Weight SRAMs x NUM_CLASSES (`sram_wrapper`)
 - Threshold SRAM (`sram_wrapper`)
 - `voxel_mac_engine`
 - `voxel_gesture_classifier`
@@ -290,7 +290,7 @@ Top-level module integrating all inference stages. Instantiates:
 |-------|-------------|
 | `ST_ACCUM` | Accept and accumulate events (2-cycle RMW) |
 | `ST_WAIT_RD` | Wait for SRAM read result before readout |
-| `ST_READOUT` | Stream READOUT_BINS × GRID_SIZE² entries to feature RAM |
+| `ST_READOUT` | Stream READOUT_BINS x GRID_SIZE^2 entries to feature RAM |
 | `ST_CLEAR` | Zero the consumed bin entries |
 
 **Accumulation Timing**
@@ -329,7 +329,7 @@ When `completed_bins == READOUT_BINS`, the full temporal window is ready for rea
 
 **Arithmetic**
 ```
-product = signed(feature[i]) × signed(weight[c][i])   // 25-bit signed result
+product = signed(feature[i]) x signed(weight[c][i])   // 25-bit signed result
 score[c] += product                                    // SCORE_BITS accumulator
 ```
 
@@ -339,7 +339,7 @@ Features are zero-extended to signed before multiplication; weights are already 
 
 | Signal | Width | Description |
 |--------|-------|-------------|
-| `scores_flat` | NUM_CLASSES × SCORE_BITS | All class scores, flattened |
+| `scores_flat` | NUM_CLASSES x SCORE_BITS | All class scores, flattened |
 | `scores_valid` | 1 | 1-cycle pulse when scores are ready |
 | `score_A/B/C/D` | 32 | Lower 32 bits of each score (debug) |
 

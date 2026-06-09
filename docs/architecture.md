@@ -99,7 +99,7 @@ Weight and threshold commands are routed directly to SRAM write ports and do not
 
 ### 5. Temporal Binning (`voxel_binning`)
 
-This is the core accumulation engine. It maintains a **ring buffer of NUM_BINS (16) temporal bins**, each holding a 16×16 grid of saturating event counters.
+This is the core accumulation engine. It maintains a **ring buffer of NUM_BINS (16) temporal bins**, each holding a 16x16 grid of saturating event counters.
 
 **Accumulation (ST_ACCUM):**
 Every incoming event triggers a 2-cycle read-modify-write:
@@ -119,14 +119,14 @@ After readout the consumed bins are zeroed before reuse.
 
 ### 6. Feature RAM (Double-Buffered SRAM)
 
-The feature window (`GRID_SIZE² × READOUT_BINS` entries of `COUNTER_BITS` bits) is stored in GF180MCU SRAM macros via `sram_wrapper`. The double-buffer scheme allows the MAC engine to read one window while the binning stage writes the next, preventing pipeline stalls.
+The feature window (`GRID_SIZE^2 x READOUT_BINS` entries of `COUNTER_BITS` bits) is stored in GF180MCU SRAM macros via `sram_wrapper`. The double-buffer scheme allows the MAC engine to read one window while the binning stage writes the next, preventing pipeline stalls.
 
 ### 7. MAC Scoring (`voxel_mac_engine`)
 
-Once a feature window is ready, the MAC engine streams through all `FEATURE_COUNT = GRID_SIZE² × READOUT_BINS` addresses in order:
+Once a feature window is ready, the MAC engine streams through all `FEATURE_COUNT = GRID_SIZE^2 x READOUT_BINS` addresses in order:
 
 ```
-score[c] = Σ feature[i] × weight[c][i]   for i in 0..FEATURE_COUNT-1
+score[c] = sum(feature[i] x weight[c][i])   for i in 0..FEATURE_COUNT-1
 ```
 
 - Features are `COUNTER_BITS`-wide unsigned integers.
@@ -135,7 +135,7 @@ score[c] = Σ feature[i] × weight[c][i]   for i in 0..FEATURE_COUNT-1
 
 All four class scores are computed in a single sequential pass (the engine reads the same feature address from all four weight SRAMs simultaneously).
 
-Computation latency: `FEATURE_COUNT + 2` cycles. At 16×16×16 features this is 4098 cycles ≈ 64 µs at 64 MHz.
+Computation latency: `FEATURE_COUNT + 2` cycles. At 16x16x16 features this is 4098 cycles ≈ 64 µs at 64 MHz.
 
 ### 8. Gesture Classification (`voxel_gesture_classifier`)
 
@@ -145,7 +145,7 @@ A 4-stage pipeline performs:
 3. **Confidence check** — compare `(max_score − second_score)` against a per-class difference threshold (addresses 4–7).
 4. **Output** — assert `gesture_valid` if the score threshold passes; assert `gesture_confidence` if the margin threshold also passes.
 
-Both thresholds are signed comparisons, which allows negative bias (always suppress) or very permissive tuning.
+Both thresholds are signed comparisons, which allows negative bias (always suppress) and easier tuning.
 
 ### 9. Debug Infrastructure (`selectable_debug`)
 
@@ -157,12 +157,12 @@ All 32-bit debug signals are latched behind flops to break long combinational pa
 
 | SRAM | Depth | Width | Purpose |
 |------|-------|-------|---------|
-| counter_sram | NUM_BINS × GRID_SIZE² | COUNTER_BITS | Voxel event counters (binning) |
-| feature_ram | GRID_SIZE² × READOUT_BINS | COUNTER_BITS | Feature window (double-buffered) |
+| counter_sram | NUM_BINS x GRID_SIZE^2 | COUNTER_BITS | Voxel event counters (binning) |
+| feature_ram | GRID_SIZE^2 x READOUT_BINS | COUNTER_BITS | Feature window (double-buffered) |
 | weight_sram[0..3] | FEATURE_COUNT | WEIGHT_BITS | Per-class weights |
 | thresh_sram | 8 | SCORE_BITS | Class + diff thresholds |
 
-All SRAMs are backed by tiled GF180MCU macros (256×8, 512×8, or 1024×8) selected automatically by `sram_wrapper` based on depth/width parameters.
+All SRAMs are backed by tiled GF180MCU macros (256x8, 512x8, or 1024x8) selected automatically by `sram_wrapper` based on depth/width parameters.
 
 ---
 
@@ -197,7 +197,7 @@ BOOT ──(boot_req)──▶ LOAD ──(evt_reads_done)──▶ RUN ──(r
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `CLK_FREQ_HZ` | 64,000,000 | Core clock |
-| `GRID_SIZE` | 16 | Spatial grid dimension (N×N) |
+| `GRID_SIZE` | 16 | Spatial grid dimension (NxN) |
 | `NUM_BINS` | 16 | Ring buffer depth |
 | `READOUT_BINS` | 16 | Feature window temporal depth |
 | `COUNTER_BITS` | 16 | Saturating event counter width |

@@ -1,9 +1,5 @@
 # Simulation Guide (`cocotb/`)
 
-μTheia uses [cocotb](https://www.cocotb.org/) 2.0.1 with [Icarus Verilog](https://github.com/steveicarus/iverilog) as the underlying simulator.
-
----
-
 ## Quick Start
 
 ```bash
@@ -43,8 +39,7 @@ cocotb/
 ├── spi_wrapper_tb.py           # spi_wrapper tests
 ├── voxel_bin_core_tb.py        # Full pipeline integration
 ├── soc_tb.py                   # SOC-level tests
-├── chip_top_tb.py              # Full chip with IO pads
-└── chip_top_tb_new.py          # Advanced chip-level gesture tests
+└── chip_top_tb.py              # Full chip with IO pads; end-to-end gesture classification
 ```
 
 ---
@@ -184,9 +179,9 @@ Integration test of the full pipeline:
 3. Send TIME_HIGH + CD events over a 1-second window.
 4. Verify gesture output.
 
-### `chip_top_tb.py` / `chip_top_tb_new.py`
+### `chip_top_tb.py`
 
-End-to-end tests including IO pad models. `chip_top_tb_new.py` drives complete gesture recordings from `EVT2_gesture_set/` and verifies the correct class is output.
+End-to-end tests including IO pad models. Tests cover: reset and `spi_ready` assertion, SPI boot and MISO readback, debug-page sweep (pages 0–4), ALT_INPUT_MODE toggle (default ↔ alt SPI interface), and a full classification test (`test_classify_all_gestures`) that streams each of the four recorded gesture `.bin` files from `EVT2_gesture_set/` through the chip's input pins and asserts the correct dominant class is output. The testbench uses `_drive_spi_pins()` to apply SPI pin changes on the falling edge of the chip clock, which keeps the stimulus timing-safe for SDF gate-level simulation.
 
 ---
 
