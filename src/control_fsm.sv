@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 module control_fsm #(
     parameter int unsigned PWR_WAIT_CYCLES = 1024
 ) (

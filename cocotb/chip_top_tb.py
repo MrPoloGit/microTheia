@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: © 2025 Project Template Contributors
+# SPDX-FileCopyrightText: © 2026 Group G Contributors
 # SPDX-License-Identifier: Apache-2.0
 #
 # chip_top testbench
@@ -20,7 +20,7 @@
 #   bits only (bidir_oe[5:2] and bidir_out[5:2]).
 #
 # NOTE on CSV vs RTL pin naming:
-#   pin_chart.csv labels input pins 2-4 as SPI_DEF_* and 5-7 as SPI_ALT_*.
+#   docs/pin_chart.csv labels input pins 2-4 as SPI_DEF_* and 5-7 as SPI_ALT_*.
 #   chip_core.sv routes pins [5,6,7] to SPI when alt_select=0 (the power-on
 #   default) and pins [2,3,4] when alt_select=1.  This testbench follows the RTL.
 

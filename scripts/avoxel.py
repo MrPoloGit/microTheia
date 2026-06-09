@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 import numpy as np
 import matplotlib.pyplot as plt
 from voxel import EventProcessor

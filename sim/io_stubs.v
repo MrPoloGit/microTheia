@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 // Behavioral stubs for GF180MCU IO pad cells.
 // Used for RTL simulation so the PDK is not required.
 // All power-pin ports are ignored (USE_POWER_PINS not defined in RTL sim).

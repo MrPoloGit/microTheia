@@ -16,7 +16,7 @@ Full technical documentation is in the [`docs/`](docs/) directory:
 | [`docs/simulation.md`](docs/simulation.md) | cocotb testbenches, utility functions, configuration files, waveform viewing |
 | [`docs/limitations.md`](docs/limitations.md) | Known limitations, things that don't work, results, and future improvements |
 
-The [`debug_mux_pinout.txt`](debug_mux_pinout.txt) file documents per-bit assignments for all 11 debug bus pages.
+The [`debug_mux_pinout.txt`](docs/debug_mux_pinout.txt) file documents per-bit assignments for all 11 debug bus pages.
 
 ## Caveats
 

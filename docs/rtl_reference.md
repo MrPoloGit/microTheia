@@ -388,4 +388,4 @@ All outputs are registered behind flops to prevent long combinational chains fro
 | 9 | Class C score |
 | 10 | Class D score |
 
-See [`debug_mux_pinout.txt`](../debug_mux_pinout.txt) for exact per-bit assignments within each page.
+See [`debug_mux_pinout.txt`](debug_mux_pinout.txt) for exact per-bit assignments within each page.
