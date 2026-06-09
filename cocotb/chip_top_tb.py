@@ -29,7 +29,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, NextTimeStep, RisingEdge
+from cocotb.triggers import ClockCycles, FallingEdge, NextTimeStep, RisingEdge
 
 # ── Environment ───────────────────────────────────────────────────────────────
 sim      = os.getenv("SIM",  "icarus")
@@ -132,6 +132,19 @@ class InputPins:
         dut.input_PAD.value = self._v
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
+
+async def _drive_spi_pins(dut, pins):
+    """Apply external SPI pin changes away from clk_PAD's sampling edge.
+
+    Timed GLS annotates delay on both clk_PAD and input_PAD paths. If the
+    testbench changes SCLK/MOSI/CS immediately after a rising clk_PAD edge, the
+    delayed core clock can see those inputs move inside the same active edge.
+    Driving on the falling edge gives the pad-delayed signals half a chip cycle
+    of setup before the next rising edge while preserving the SPI bit rate.
+    """
+    await FallingEdge(dut.clk_PAD)
+    pins.drive(dut)
+
 
 async def _start_clock(dut):
     cocotb.start_soon(Clock(dut.clk_PAD, CHIP_PERIOD_PS, "ps").start())
@@ -256,14 +269,14 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     pins.set(p_cs,   1)
     pins.set(p_sclk, 0)
     pins.set(p_mosi, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     # Pre-load MSB of first word, then assert CS
     first = int(words[0]) & 0xFFFFFFFF
     pins.set(p_mosi, (first >> (DATA_WIDTH - 1)) & 1)
     pins.set(p_cs, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     for widx, word in enumerate(words):
@@ -274,7 +287,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
         for bit in range(DATA_WIDTH):
             # Rising SCLK — slave samples MOSI here
             pins.set(p_sclk, 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
             # Sample MISO while SCLK is high
@@ -285,7 +298,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
             pins.set(p_sclk, 0)
             if bit < DATA_WIDTH - 1:
                 pins.set(p_mosi, (word >> (DATA_WIDTH - 2 - bit)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
         if capture_miso:
@@ -296,7 +309,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
         if widx < len(words) - 1:
             nxt = int(words[widx + 1]) & 0xFFFFFFFF
             pins.set(p_mosi, (nxt >> (DATA_WIDTH - 1)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
 
         if progress_every and (widx + 1) % progress_every == 0:
             dut._log.info(f"{tag}: streamed {widx + 1}/{len(words)} words "
@@ -306,7 +319,7 @@ async def _spi_stream(dut, pins, words, *, alt=False,
     await ClockCycles(dut.clk_PAD, 4)
     pins.set(p_cs, 1)
     pins.set(p_sclk, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 8)
 
     dut._log.info(f"{tag}: done ({len(words)} words)")
@@ -1552,9 +1565,9 @@ def chip_top_runner():
             proj_path / "../src/voxel_binning.sv",
             proj_path / "../src/voxel_gesture_classifier.sv",
             proj_path / "../src/voxel_mac_engine.sv",
-            proj_path / "../src/verilog_spi/spi_module.v",
-            proj_path / "../src/verilog_spi/pos_edge_det.v",
-            proj_path / "../src/verilog_spi/neg_edge_det.v",
+            proj_path / "../third_party/verilog_spi/spi_module.v",
+            proj_path / "../third_party/verilog_spi/pos_edge_det.v",
+            proj_path / "../third_party/verilog_spi/neg_edge_det.v",
         ]
 
         # IO pad and SRAM models: use real PDK files when available, otherwise
