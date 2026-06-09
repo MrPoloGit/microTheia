@@ -379,7 +379,7 @@ All outputs are registered behind flops to prevent long combinational chains fro
 | 0 | Classifier and MAC engine handshake/status signals |
 | 1 | Voxel binning readout bus |
 | 2 | Decoder, FIFO, and core-level status |
-| 3 | Reserved (FSM state — currently open) |
+| 3 | `control_fsm` state: `main_state_dbg_o` [11:8], `load_state_dbg_o` [7:2], `boot_fail_o` [1], `boot_done_o` [0] |
 | 4 | Decoder X/Y event output |
 | 5 | FIFO input word |
 | 6 | FIFO output word |
