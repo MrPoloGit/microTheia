@@ -79,8 +79,11 @@ CHIP_TOP_SRCS := \
     $(MAKEFILE_DIR)/third_party/verilog_spi/spi_module.v \
     $(MAKEFILE_DIR)/third_party/verilog_spi/pos_edge_det.v \
     $(MAKEFILE_DIR)/third_party/verilog_spi/neg_edge_det.v \
-    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v \
-    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__marker/vh/gf180mcu_ws_ip__marker.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__qrcode_id/vh/gf180mcu_ws_ip__qrcode_id.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__shuttle_id/vh/gf180mcu_ws_ip__shuttle_id.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__project_id/vh/gf180mcu_ws_ip__project_id.v
 
 # IO pad sources: prefer real PDK models; fall back to behavioral stubs so
 # sim-chip-top-sanity works in CI without a PDK clone.
