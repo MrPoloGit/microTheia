@@ -1,6 +1,6 @@
 MAKEFILE_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-RUN_TAG = $(shell ls librelane/runs/ | tail -n 1)
+RUN_TAG := $(shell ls librelane/runs/ 2>/dev/null | tail -n 1)
 TOP = chip_top
 
 PDK_ROOT ?= $(MAKEFILE_DIR)/gf180mcu
@@ -57,8 +57,38 @@ ifeq ($(filter $(SLOT),$(AVAILABLE_SLOTS)),)
     $(error $(SLOT) does not exist in AVAILABLE_SLOTS: $(AVAILABLE_SLOTS))
 endif
 
-SLOT_DEFINE = SLOT_$(shell echo $(SLOT) | tr '[:lower:]' '[:upper:]')
-SRAM_DEFINE = SRAM_$(SRAM)
+SLOT_UPPER  := $(shell echo $(SLOT) | tr '[:lower:]' '[:upper:]')
+SLOT_DEFINE  = SLOT_$(SLOT_UPPER)
+SRAM_DEFINE  = SRAM_$(SRAM)
+
+# Source lists for sim-chip-top-sanity (Makefile.sim path, no chip_top_tb.py runner).
+CHIP_TOP_SRCS := \
+    $(MAKEFILE_DIR)/src/chip_top.sv \
+    $(MAKEFILE_DIR)/src/chip_core.sv \
+    $(MAKEFILE_DIR)/src/soc.sv \
+    $(MAKEFILE_DIR)/src/spi_wrapper.sv \
+    $(MAKEFILE_DIR)/src/control_fsm.sv \
+    $(MAKEFILE_DIR)/src/evt2_decoder.sv \
+    $(MAKEFILE_DIR)/src/sram_wrapper.sv \
+    $(MAKEFILE_DIR)/src/input_fifo.sv \
+    $(MAKEFILE_DIR)/src/selectable_debug.sv \
+    $(MAKEFILE_DIR)/src/voxel_bin_core.sv \
+    $(MAKEFILE_DIR)/src/voxel_binning.sv \
+    $(MAKEFILE_DIR)/src/voxel_gesture_classifier.sv \
+    $(MAKEFILE_DIR)/src/voxel_mac_engine.sv \
+    $(MAKEFILE_DIR)/third_party/verilog_spi/spi_module.v \
+    $(MAKEFILE_DIR)/third_party/verilog_spi/pos_edge_det.v \
+    $(MAKEFILE_DIR)/third_party/verilog_spi/neg_edge_det.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
+
+# IO pad sources: prefer real PDK models; fall back to behavioral stubs so
+# sim-chip-top-sanity works in CI without a PDK clone.
+_PDK_IO_V := $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v
+CHIP_TOP_IO_SRCS := $(if $(wildcard $(_PDK_IO_V)),\
+    $(_PDK_IO_V) \
+    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v,\
+    $(MAKEFILE_DIR)/sim/io_stubs.v)
 
 LIBRELANE_OPTS = --pdk ${PDK} --pdk-root ${PDK_ROOT} --manual-pdk --scl ${SCL} --pad ${PAD}
 LIBRELANE_CONFIGS = librelane/slots/slot_${SLOT}.yaml librelane/macros/macros_${MACROS}.yaml librelane/config.yaml
