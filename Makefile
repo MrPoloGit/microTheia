@@ -85,13 +85,10 @@ CHIP_TOP_SRCS := \
     $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__shuttle_id/vh/gf180mcu_ws_ip__shuttle_id.v \
     $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__project_id/vh/gf180mcu_ws_ip__project_id.v
 
-# IO pad sources: prefer real PDK models; fall back to behavioral stubs so
-# sim-chip-top-sanity works in CI without a PDK clone.
-_PDK_IO_V := $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v
-CHIP_TOP_IO_SRCS := $(if $(wildcard $(_PDK_IO_V)),\
-    $(_PDK_IO_V) \
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v,\
-    $(MAKEFILE_DIR)/sim/io_stubs.v)
+# IO pad sources for sim-chip-top-sanity: always use the behavioral stubs.
+# sim/io_stubs.v stubs all GF180MCU IO pad cells so no PDK clone is needed.
+# (GLS and full chip_top_tb.py runs resolve their own IO sources internally.)
+CHIP_TOP_IO_SRCS := $(MAKEFILE_DIR)/sim/io_stubs.v
 
 LIBRELANE_OPTS = --pdk ${PDK} --pdk-root ${PDK_ROOT} --manual-pdk --scl ${SCL} --pad ${PAD}
 LIBRELANE_CONFIGS = librelane/slots/slot_${SLOT}.yaml librelane/macros/macros_${MACROS}.yaml librelane/config.yaml
