@@ -37,8 +37,6 @@ The [`debug_mux_pinout.txt`](debug_mux_pinout.txt) file documents per-bit assign
 
 - **SDF back-annotation is not fully working.** `make sim-sdf` is provided but timing-accurate simulation is unreliable, the Verilog timing models for GF180MCU SRAMs are not consistently present in the open PDK distribution, and Icarus will silently fall back to zero-delay functional simulation.
 
-- **iCE40 FPGA target uses a reduced configuration.** The full 16×16 × 16-bin design does not fit in iCE40 resources. The FPGA flow uses an 8×8 grid with 8 bins. See [`ice40/README.md`](ice40/README.md) for details.
-
 ## Prerequisites and setup
 
 Make sure Git, Git LFS, and NIX are installed.
@@ -152,19 +150,6 @@ export SLOT=0p5x0p5
 
 You can change the slot that is selected by default in the Makefile by editing the value of `DEFAULT_SLOT`.
 
-## Synthesis for ICE40 FPGA and communicating with it
-
-The current architecture we are using is voxel_bin.
-
-```bash
-make ice40 ARCH=architecture     # Run iCE40 FPGA build
-make ice40-prog                  # Program iCE40 board
-make ice40-timing                # Timing report for iCE40 build
-make ice40-clean                 # Cleans out all ice40 logic
-```
-
-Once synthesized and having a working bitstream to flash and test, go into the [`ice40`](ice40/README.md) folder.
-
 ## Tool Versions
 
 | Tool | Version | Source |
@@ -180,7 +165,7 @@ Once synthesized and having a working bitstream to flash and test, go into the [
 | cocotb | 2.0.1 | Dockerfile, scripts/requirements.txt |
 | pyserial | 3.5 | Dockerfile, ice40/requirements.txt |
 
-Run `pip install -r scripts/requirements.txt` for RTL simulation, or `pip install -r ice40/requirements.txt` for FPGA tools.
+Run `pip install -r scripts/requirements.txt` for RTL simulation.
 
 ## Third Party
 
