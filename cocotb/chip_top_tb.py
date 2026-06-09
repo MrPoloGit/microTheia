@@ -33,7 +33,7 @@ from cocotb_tools.runner import get_runner
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, NextTimeStep, RisingEdge
+from cocotb.triggers import ClockCycles, FallingEdge, NextTimeStep, RisingEdge
 
 # ── Environment ───────────────────────────────────────────────────────────────
 sim = os.getenv("SIM", "icarus")
@@ -145,7 +145,17 @@ class InputPins:
 
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
+async def _drive_spi_pins(dut, pins):
+    """Apply external SPI pin changes away from clk_PAD's sampling edge.
 
+    Timed GLS annotates delay on both clk_PAD and input_PAD paths. If the
+    testbench changes SCLK/MOSI/CS immediately after a rising clk_PAD edge, the
+    delayed core clock can see those inputs move inside the same active edge.
+    Driving on the falling edge gives the pad-delayed signals half a chip cycle
+    of setup before the next rising edge while preserving the SPI bit rate.
+    """
+    await FallingEdge(dut.clk_PAD)
+    pins.drive(dut)
 
 async def _start_clock(dut):
     cocotb.start_soon(Clock(dut.clk_PAD, CHIP_PERIOD_PS, "ps").start())
@@ -281,14 +291,14 @@ async def _spi_stream(
     pins.set(p_cs, 1)
     pins.set(p_sclk, 0)
     pins.set(p_mosi, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     # Pre-load MSB of first word, then assert CS
     first = int(words[0]) & 0xFFFFFFFF
     pins.set(p_mosi, (first >> (DATA_WIDTH - 1)) & 1)
     pins.set(p_cs, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 4)
 
     for widx, word in enumerate(words):
@@ -299,7 +309,7 @@ async def _spi_stream(
         for bit in range(DATA_WIDTH):
             # Rising SCLK — slave samples MOSI here
             pins.set(p_sclk, 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
             # Sample MISO while SCLK is high
@@ -310,7 +320,7 @@ async def _spi_stream(
             pins.set(p_sclk, 0)
             if bit < DATA_WIDTH - 1:
                 pins.set(p_mosi, (word >> (DATA_WIDTH - 2 - bit)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
             await ClockCycles(dut.clk_PAD, half)
 
         if capture_miso:
@@ -321,7 +331,7 @@ async def _spi_stream(
         if widx < len(words) - 1:
             nxt = int(words[widx + 1]) & 0xFFFFFFFF
             pins.set(p_mosi, (nxt >> (DATA_WIDTH - 1)) & 1)
-            pins.drive(dut)
+            await _drive_spi_pins(dut, pins)
 
         if progress_every and (widx + 1) % progress_every == 0:
             dut._log.info(
@@ -332,7 +342,7 @@ async def _spi_stream(
     await ClockCycles(dut.clk_PAD, 4)
     pins.set(p_cs, 1)
     pins.set(p_sclk, 0)
-    pins.drive(dut)
+    await _drive_spi_pins(dut, pins)
     await ClockCycles(dut.clk_PAD, 8)
 
     dut._log.info(f"{tag}: done ({len(words)} words)")
