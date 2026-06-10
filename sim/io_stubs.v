@@ -43,16 +43,7 @@ module gf180mcu_fd_io__bi_24t (
     assign Y   = PAD;
 endmodule
 
-// Power / ground pads — no signal ports needed for RTL sim.
-// gf180mcu_fd_io variants: used by chip_top.sv when PAD_gf180mcu_ocd_io is not defined.
-// Both dvdd and dvss macros map to these same two cells (vdd→dvdd, vss→dvss in fd_io).
-module gf180mcu_fd_io__dvdd;
-endmodule
-
-module gf180mcu_fd_io__dvss;
-endmodule
-
-// gf180mcu_ws_io variants: kept for completeness (used in some sim/ vendored models).
+// Power / ground pads — no signal ports needed for RTL sim
 module gf180mcu_ws_io__dvdd;
 endmodule
 

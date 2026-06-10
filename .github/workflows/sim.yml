@@ -23,17 +23,6 @@ jobs:
             extra-substituters = https://nix-cache.fossi-foundation.org
             extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
 
-      - name: Build Nix devShell
-        run: |
-          nix build \
-            --no-link \
-            --accept-flake-config \
-            .#devShells.x86_64-linux.default
-
-      - name: Clone PDK
-        run: |
-          nix develop --accept-flake-config --command make clone-pdk
-
       # Individual module RTL sims (fast, no chip_top IO pads required)
       - run: nix develop --accept-flake-config --command make sim DUT=input_fifo
       - run: nix develop --accept-flake-config --command make sim DUT=evt2_decoder
