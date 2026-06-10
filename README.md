@@ -4,7 +4,6 @@
 
 <img width="657" height="855" alt="μTheia layout image" src="https://github.com/user-attachments/assets/28d2bab8-3486-4232-8110-f9bdbcd9f0cf" />
 
-This project targets the wafer.space MPW flow using the GF180MCU PDK.
 
 ## Project summary
 
@@ -58,7 +57,6 @@ nix-shell
 
 The remaining commands assume that this shell is active.
 
-Docker can also be used through the devcontainer or GitHub Codespaces flow for basic simulation and development. The full LibreLane implementation flow should be run through the Nix environment.
 
 ## Quick start
 
