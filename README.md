@@ -28,6 +28,14 @@ Full technical documentation is in the [`docs/`](docs/) directory:
 
 The [`docs/debug_mux_pinout.txt`](docs/debug_mux_pinout.txt) file documents per-bit assignments for the debug bus pages.
 
+## Timing closure status
+
+<img width="1160" height="227" alt="Screenshot 2026-06-09 at 7 29 33 PM" src="https://github.com/user-attachments/assets/12940b41-9aea-4267-968b-bf471471bd89" />
+
+### Ready for manufacture!
+### Positive setup and hold slack in all corners.
+Note: Max capacitance violations are mostly pads being checked against the 0.2 pF global limit. The remaining max capacitance violations are all buffers within the clock net, again being checked against the aggressive 0.2 pF global limit. In both cases, all maximum capacitance violations were manually investigated, and the offending cells were checked to be within the maximum capacitances listed in their Liberty files.
+
 ## Important caveats
 
 Read these before running the project for the first time.
