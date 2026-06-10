@@ -108,7 +108,7 @@ sim: ## Run RTL simulation (no DUT or DUT=chip_top → chip_top sanity check; el
 	@if [ -z "$(DUT)" ]; then \
 		$(MAKE) sim-chip-top-sanity; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
-		$(MAKE) sim-chip-top-sanity; \
+		$(MAKE) sim-chip-top; \
 	else \
 		for d in $(SIM_DUTS); do \
 			echo "===================================================="; \
