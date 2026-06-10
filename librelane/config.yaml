@@ -115,8 +115,8 @@ CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 15.625 # 64 MHz
 
 # Fix hold violations
-PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
-GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.4
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.35
 
 # new settings to try from from ethan's list
 # current best results are positive setup/hold slack, clean slew, and 102 cap violations
@@ -124,11 +124,11 @@ GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
 
 DESIGN_REPAIR_MAX_SLEW_PCT: 30          # default: 20 %
 
-DESIGN_REPAIR_MAX_CAP_PCT: 60           # default: 20 %
+DESIGN_REPAIR_MAX_CAP_PCT: 50           # default: 20 %
 
 GRT_DESIGN_REPAIR_MAX_SLEW_PCT: 20      # default: 10 %0
 
-GRT_DESIGN_REPAIR_MAX_CAP_PCT: 40       # default: 10 %
+GRT_DESIGN_REPAIR_MAX_CAP_PCT: 30       # default: 10 %
 
 # overrides the default max capacitance value used during CTS 
 # lower pushes CTS toward smaller clock loads per buffer, may help max cap/max slew
@@ -161,7 +161,7 @@ MAX_FANOUT_CONSTRAINT: 12 # 11 works well
 
 
 # Increase for more logic on your die
-PL_TARGET_DENSITY_PCT: 35 # 35 best so far for ver 2.0
+PL_TARGET_DENSITY_PCT: 40 # 35 best so far for ver 2.0
 GRT_ALLOW_CONGESTION: true
 
 # Fix antenna violations after DRT
