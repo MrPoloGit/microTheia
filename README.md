@@ -15,7 +15,7 @@
 - **Output / debug:** Classification results are available over SPI and through selectable debug/output pins.
 - **Frequency:** 64 MHz on-chip and 32 MHz SPI
 
-### Project status: Functionally complete, extensively verified. Migration to new wafer.space template under development.
+### Project status: Ready for manufacture once migration to new wafer.space template is complete.
 
 ## Documentation
 
@@ -36,6 +36,8 @@ The [`docs/debug_mux_pinout.txt`](docs/debug_mux_pinout.txt) file documents per-
 
 ### Positive setup and hold slack in all tested corners.
 Note: Max capacitance violations are mostly pads being checked against the 0.2 pF global limit. The remaining max capacitance violations are all buffers within the clock net, again being checked against the aggressive 0.2 pF global limit. In both cases, all maximum capacitance violations were manually investigated, and the offending cells were checked to be within the maximum capacitances listed in their Liberty files.
+
+### Full pass LVS and DRC
 
 ## Important caveats
 
