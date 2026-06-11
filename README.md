@@ -13,6 +13,9 @@
 - **Storage:** SRAM-backed feature and weight storage.
 - **Classifier:** Integer MAC scoring for four programmable motion-pattern classes.
 - **Output / debug:** Classification results are available over SPI and through selectable debug/output pins.
+- **Frequency:** 64 MHz on-chip and 32 MHz SPI
+
+### Project status: Functionally complete, extensively verified. Migration to new wafer.space template under development.
 
 ## Documentation
 
@@ -27,12 +30,11 @@ Full technical documentation is in the [`docs/`](docs/) directory:
 
 The [`docs/debug_mux_pinout.txt`](docs/debug_mux_pinout.txt) file documents per-bit assignments for the debug bus pages.
 
-## Timing closure status
+## Timing closure status @ 64 MHz
 
-<img width="1160" height="227" alt="Screenshot 2026-06-09 at 7 29 33 PM" src="https://github.com/user-attachments/assets/12940b41-9aea-4267-968b-bf471471bd89" />
+<img width="1158" height="224" alt="timing_summary_chart" src="https://github.com/user-attachments/assets/c0aba63b-7c5d-4738-8593-235abb87570f" />
 
-### Ready for manufacture!
-### Positive setup and hold slack in all corners.
+### Positive setup and hold slack in all tested corners.
 Note: Max capacitance violations are mostly pads being checked against the 0.2 pF global limit. The remaining max capacitance violations are all buffers within the clock net, again being checked against the aggressive 0.2 pF global limit. In both cases, all maximum capacitance violations were manually investigated, and the offending cells were checked to be within the maximum capacitances listed in their Liberty files.
 
 ## Important caveats
@@ -164,8 +166,8 @@ This repository is based on the wafer.space GF180MCU project template. μTheia t
 - [GF180MCU SRAM Forge](https://github.com/mithro/gf180mcu-sram-forge)
 - [Prophesee EVT2 format documentation](https://docs.prophesee.ai/stable/data/encoding_formats/evt2.html)
 - [FPGA DVS Gesture Classifier](https://github.com/jasonwaseq/FPGA-DVS-Gesture-Classifier)
-- [GenX320 STM32F746G-DISCO firmware](https://github.com/dolphin-530/x320-stm-usb)
+- [GenX320 STM32F746G-DISCO custom firmware](https://github.com/dolphin-530/x320-stm-usb)
 
-<img width="440" height="440" alt="out" src="https://github.com/user-attachments/assets/8b585ce9-d9c9-4003-8c29-1b3dd0acb709" />
+<img width="340" height="340" alt="event_based_visualization" src="https://github.com/user-attachments/assets/8b585ce9-d9c9-4003-8c29-1b3dd0acb709" />
 
 
