@@ -106,7 +106,7 @@ lint: ## Lint all SystemVerilog files in src
 
 sim: ## Run RTL simulation (no DUT or DUT=chip_top → chip_top sanity check; else run named DUT)
 	@if [ -z "$(DUT)" ]; then \
-		$(MAKE) sim-chip-top-sanity; \
+		$(MAKE) sim-chip-top; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
 		$(MAKE) sim-chip-top; \
 	else \
@@ -203,6 +203,10 @@ GL_PNR_NETLIST   := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/51-openroad-fillin
 sim-gl: ## Run post-synthesis gate-level simulation with cocotb (Icarus)
 	cd cocotb; GL=1 GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
 .PHONY: sim-gl
+
+sim-gl-chip-top-sanity: ## Run post-synthesis GL sanity check (test_sanity_evt2_and_debug only, no waves)
+	cd cocotb; GL=1 WAVES=0 COCOTB_TEST_FILTER=test_sanity_evt2_and_debug GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+.PHONY: sim-gl-chip-top-sanity
 
 sim-gl-verilator: ## Run post-synthesis gate-level simulation with Verilator (faster than Icarus)
 	cd cocotb; LD_LIBRARY_PATH="" SIM=verilator GL=1 GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py

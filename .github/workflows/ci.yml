@@ -83,7 +83,7 @@ jobs:
                   make config-pdk
             - name: Run RTL simulation
               run: |
-                  nix develop --command make sim
+                  nix develop --command make sim-chip-top-sanity
                   # cocotb also returns 0 upon failure
                   # check the simulation results
                   ! grep failure cocotb/sim_build/results.xml
@@ -112,7 +112,7 @@ jobs:
             - name: Run GL simulation
               if: success() || failure()
               run: |
-                  nix develop --command make sim-gl
+                  nix develop --command make sim-gl-chip-top-sanity
                   # cocotb also returns 0 upon failure
                   # check the simulation results
                   ! grep failure cocotb/sim_build/results.xml
