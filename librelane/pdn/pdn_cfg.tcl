@@ -138,6 +138,7 @@ if { $::env(PDN_CORE_RING) == 1 } {
         set arg_list [list]
         append_if_flag arg_list PDN_CORE_RING_ALLOW_OUT_OF_DIE -allow_out_of_die
         append_if_flag arg_list PDN_CORE_RING_CONNECT_TO_PADS -connect_to_pads
+        # maybe uncomment
         #append_if_equals arg_list PDN_EXTEND_TO "boundary" -extend_to_boundary
         append_if_exists_argument arg_list PDN_CORE_RING_CONNECT_TO_PAD_LAYERS -connect_to_pad_layers
 
@@ -160,12 +161,14 @@ if { $::env(PDN_CORE_RING) == 1 } {
             -core_offset "$::env(PDN_CORE_RING_VOFFSET) $::env(PDN_CORE_RING_HOFFSET)" \
             {*}$arg_list
 
+        # maybe uncomment
         #if { [info exists ::env(PDN_CORE_VERTICAL_LAYER)] } {
         #    add_pdn_connect \
         #        -grid stdcell_grid \
         #        -layers "$::env(PDN_CORE_VERTICAL_LAYER) $::env(PDN_HORIZONTAL_LAYER)"
         #}
 
+        # maybe uncomment
         #if { [info exists ::env(PDN_CORE_HORIZONTAL_LAYER)] } {
         #    add_pdn_connect \
         #        -grid stdcell_grid \
