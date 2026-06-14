@@ -1562,8 +1562,6 @@ def chip_top_runner():
         # gf180mcu_as_sc_mcu7t3v3 has no separate primitives.v; all others do.
         if scl != "gf180mcu_as_sc_mcu7t3v3" and scl_prim.exists():
             sources.append(scl_prim)
-        if scl == "gf180mcu_as_sc_mcu7t3v3":
-            sources.append(proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3_missing_cells.v")
         sources += [
             # IO pad models.
             io_v,
