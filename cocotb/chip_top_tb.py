@@ -1562,6 +1562,11 @@ def chip_top_runner():
         # gf180mcu_as_sc_mcu7t3v3 has no separate primitives.v; all others do.
         if scl != "gf180mcu_as_sc_mcu7t3v3" and scl_prim.exists():
             sources.append(scl_prim)
+        # Extra stubs for cells used by the netlist but missing from the PDK
+        # Verilog model (e.g. dfxtp_4). Only include when using the real PDK
+        # file — when falling back to the sim/ stub the stub already covers them.
+        if scl == "gf180mcu_as_sc_mcu7t3v3" and pdk_scl_v.exists():
+            sources.append(proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3_missing_cells.v")
         sources += [
             # IO pad models.
             io_v,

@@ -1414,66 +1414,31 @@ module gf180mcu_as_sc_mcu7t3v3__fill_8(
 
 endmodule
 
-module gf180mcu_as_sc_mcu7t3v3__fillcap_4(
-	input VPW,
-	input VNW,
-	input VDD,
-	input VSS
-);
-
-endmodule
-
-module gf180mcu_as_sc_mcu7t3v3__fillcap_8(
-	input VPW,
-	input VNW,
-	input VDD,
-	input VSS
-);
-
-endmodule
-
-module gf180mcu_as_sc_mcu7t3v3__fillcap_16(
-	input VPW,
-	input VNW,
-	input VDD,
-	input VSS
-);
-
-endmodule
-
-module gf180mcu_as_sc_mcu7t3v3__tieh_4(
+// dfxtp_4: D flip-flop, positive-edge, drive strength 4.
+// Behaviorally identical to dfxtp_2; size only affects drive strength.
+module gf180mcu_as_sc_mcu7t3v3__dfxtp_4(
 	input VPW,
 	input VNW,
 	input VDD,
 	input VSS,
 
-	output ONE
+	input CLK,
+	input D,
+	output Q
 );
 
-assign ONE = 1'b1;
+reg state;
+always @(posedge CLK) state <= D;
+assign Q = state;
 
-endmodule
-
-module gf180mcu_as_sc_mcu7t3v3__tiel_4(
-	input VPW,
-	input VNW,
-	input VDD,
-	input VSS,
-
-	output ZERO
-);
-
-assign ZERO = 1'b0;
-
-endmodule
-
-module gf180mcu_as_sc_mcu7t3v3__diode_2(
-	input VPW,
-	input VNW,
-	input VDD,
-	input VSS,
-
-	input DIODE
-);
+`ifndef FUNCTIONAL
+specify
+	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
+	$setup(posedge D, posedge CLK, 0:0:0);
+	$setup(negedge D, posedge CLK, 0:0:0);
+	$hold(posedge CLK, posedge D, 0:0:0);
+	$hold(posedge CLK, negedge D, 0:0:0);
+endspecify
+`endif
 
 endmodule
