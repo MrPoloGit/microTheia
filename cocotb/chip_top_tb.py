@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: © 2026 Group G Contributors
+# SPDX-FileCopyrightText: © 2025 Project Template Contributors
 # SPDX-License-Identifier: Apache-2.0
 #
 # chip_top testbench
@@ -25,30 +25,28 @@
 #   default) and pins [2,3,4] when alt_select=1.  This testbench follows the RTL.
 
 import os
+import random
+import logging
 from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, FallingEdge, NextTimeStep, RisingEdge
+from cocotb.triggers import ClockCycles, FallingEdge, NextTimeStep, RisingEdge, Timer, Edge
+from cocotb_tools.runner import get_runner
 
 # ── Environment ───────────────────────────────────────────────────────────────
-sim      = os.getenv("SIM",  "icarus")
-# PDK_ROOT default tries the in-tree pdk first, then falls back to ~/.ciel.
-# The in-tree copy is what librelane synthesised against, so it's the correct
-# source for GLS standard-cell models.
-_default_pdk_root = Path(__file__).resolve().parents[1] / "gf180mcu"
-if not _default_pdk_root.exists():
-    _default_pdk_root = Path("~/.ciel").expanduser()
-pdk_root = Path(os.getenv("PDK_ROOT", _default_pdk_root))
-pdk      = os.getenv("PDK",  "gf180mcuD")
-# Default SCL matches what librelane actually used (see synth config.json:
-# STD_CELL_LIBRARY = gf180mcu_as_sc_mcu7t3v3). The previous default
-# (gf180mcu_fd_sc_mcu7t5v0) does NOT match the netlist cells.
-scl      = os.getenv("SCL",  "gf180mcu_as_sc_mcu7t3v3")
-gl       = os.getenv("GL", "").lower() not in ("", "0", "false", "no")
+sim      = os.getenv("SIM", "icarus")
+gl       = os.getenv("GL", False)
+pdk_root = os.getenv("PDK_ROOT", Path(__file__).resolve().parent / "../gf180mcu")
+pdk      = os.getenv("PDK", "gf180mcuD")
+scl      = os.getenv("SCL", "gf180mcu_as_sc_mcu7t3v3")
+pad      = os.getenv("PAD", "gf180mcu_fd_io")
+sram     = os.getenv("SRAM", "gf180mcu_ocd_ip_sram")
+slot     = os.getenv("SLOT", "1x1")
+
+# CUSTOM STUFF ----------------------------------------------------------------
 timing   = os.getenv("TIMING", "").lower() not in ("", "0", "false", "no")
 sdf_file = os.getenv("SDF_FILE")
-slot     = os.getenv("SLOT", "1x1")
 
 # Resolve the GLS netlist:
 #   1. Honour the GL_NETLIST env var if set (absolute path to any .nl.v/.pnl.v).
@@ -74,6 +72,7 @@ def _resolve_gl_netlist() -> Path:
     return _repo_root / "librelane" / "runs" / "RUN_<missing>" / "chip_top.nl.v"
 
 gl_netlist = _resolve_gl_netlist()
+# ------------------------------------------------------------------------
 
 hdl_toplevel = "chip_top"
 
@@ -1532,6 +1531,10 @@ def chip_top_runner():
     proj_path = Path(__file__).resolve().parent
 
     defines  = {f"SLOT_{slot.upper()}": True}
+    defines[f"PDK_{pdk.replace('-', '_')}"] = True
+    defines[f"SCL_{scl}"] = True
+    defines[f"PAD_{pad}"] = True
+    defines[f"SRAM_{sram}"] = True
     includes = [proj_path / "../src/"]
 
     if gl:
@@ -1541,24 +1544,27 @@ def chip_top_runner():
                 "Override with GL_NETLIST=/abs/path/to/chip_top.{nl,pnl}.v"
             )
 
-        pdk_libs = pdk_root / pdk / "libs.ref"
-        # Vendored overrides — see headers in each file for the per-cell
-        # reason. We use sim/ copies instead of the upstream PDK files for
-        # the std-cell library and the IO pads (Verilator can't elaborate
-        # the upstream IO models which use unsupported `rnmos` primitives).
-        scl_v        = proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3.v"
-        scl_prim     = pdk_libs / scl / "verilog" / "primitives.v"
-        io_v         = proj_path / "../sim/gf180mcu_fd_io.v"
-        ws_io_v      = proj_path / "../sim/gf180mcu_ws_io.v"
+        pdk_libs = Path(pdk_root) / pdk / "libs.ref"
+
+        # SCL cell models: prefer ciel-managed PDK path; fall back to the
+        # vendored sim/ stub (kept for Verilator compat / offline use).
+        pdk_scl_v = pdk_libs / scl / "verilog" / f"{scl}.v"
+        scl_v = pdk_scl_v if pdk_scl_v.exists() else proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3.v"
+        scl_prim = pdk_libs / scl / "verilog" / "primitives.v"
+
+        # IO pad models: prefer ciel-managed PDK path; fall back to vendored stubs.
+        pdk_io_v = pdk_libs / pad / "verilog" / f"{pad}.v"
+        io_v = pdk_io_v if pdk_io_v.exists() else proj_path / "../sim/gf180mcu_fd_io.v"
+        pdk_wsio_v = pdk_libs / pad / "verilog" / "gf180mcu_ws_io.v"
+        ws_io_v = pdk_wsio_v if pdk_wsio_v.exists() else proj_path / "../sim/gf180mcu_ws_io.v"
 
         sources = [scl_v]
-        if scl_prim.exists():
+        # gf180mcu_as_sc_mcu7t3v3 has no separate primitives.v; all others do.
+        if scl != "gf180mcu_as_sc_mcu7t3v3" and scl_prim.exists():
             sources.append(scl_prim)
+        if scl == "gf180mcu_as_sc_mcu7t3v3":
+            sources.append(proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3_missing_cells.v")
         sources += [
-            # Extra behavioral models/stubs for cells used by the netlist but
-            # missing from the simulator-friendly std-cell model.
-            proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3_missing_cells.v",
-
             # IO pad models.
             io_v,
             ws_io_v,
@@ -1580,7 +1586,7 @@ def chip_top_runner():
         # blocks active, so we must NOT define FUNCTIONAL in that mode.
         # For plain functional GLS the specify blocks add overhead with no
         # benefit, so we keep FUNCTIONAL defined to suppress them.
-        defines = {"functional": True}
+        defines.update({"functional": True})
         if not timing:
             # Functional GLS only: suppress specify blocks for faster compile.
             defines["FUNCTIONAL"] = True
@@ -1608,22 +1614,24 @@ def chip_top_runner():
             proj_path / "../third_party/verilog_spi/neg_edge_det.v",
         ]
 
-        # IO pad and SRAM models: use real PDK files when available, otherwise
-        # fall back to the behavioral stubs in sim/io_stubs.v so the PDK does
-        # not have to be cloned just to run RTL simulation.
-        pdk_io_v   = Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v"
-        pdk_wsio_v = Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v"
-        pdk_sram_v = Path(pdk_root) / pdk / "libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v"
+        # IO pad and SRAM models: check each file individually against the
+        # ciel-managed PDK; fall back to the vendored sim/ stub if absent.
+        # gf180mcu_ws_io.v is a wafer-space supply-pad stub that may not be
+        # present in all PDK distributions.
+        pdk_io_v   = Path(pdk_root) / pdk / "libs.ref" / pad  / "verilog" / f"{pad}.v"
+        pdk_wsio_v = Path(pdk_root) / pdk / "libs.ref" / pad  / "verilog" / "gf180mcu_ws_io.v"
+        pdk_sram_v = Path(pdk_root) / pdk / "libs.ref" / sram / "verilog" / f"{sram}__sram512x8m8wm1.v"
 
-        if pdk_io_v.exists():
-            sources += [pdk_io_v, pdk_wsio_v, pdk_sram_v]
-        else:
-            print(f"[chip_top_tb] PDK not found at {pdk_root}/{pdk}; using sim/io_stubs.v")
-            sources.append(proj_path / "../sim/io_stubs.v")
+        sources.append(pdk_io_v   if pdk_io_v.exists()   else proj_path / "../sim/gf180mcu_fd_io.v")
+        sources.append(pdk_wsio_v if pdk_wsio_v.exists() else proj_path / "../sim/gf180mcu_ws_io.v")
+        sources.append(pdk_sram_v if pdk_sram_v.exists() else proj_path / "../sim/gf180mcu_ocd_ip_sram_models.v")
 
     sources += [
-        proj_path / "../ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v",
         proj_path / "../ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v",
+        proj_path / "../ip/gf180mcu_ws_ip__marker/vh/gf180mcu_ws_ip__marker.v",
+        proj_path / "../ip/gf180mcu_ws_ip__qrcode_id/vh/gf180mcu_ws_ip__qrcode_id.v",
+        proj_path / "../ip/gf180mcu_ws_ip__shuttle_id/vh/gf180mcu_ws_ip__shuttle_id.v",
+        proj_path / "../ip/gf180mcu_ws_ip__project_id/vh/gf180mcu_ws_ip__project_id.v",
     ]
 
     build_args = []
