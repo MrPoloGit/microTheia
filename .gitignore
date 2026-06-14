@@ -1,10 +1,18 @@
-# Build artifacts
-synth/build/
-synth/icestorm_icebreaker/build/
-*.json
-*.asc
-*.bit
-*.log
+# GF180 stuff
+runs/
+__pycache__/
+gf180mcu/
+gf180_drc.lyrdb
+sim_build/
+final/
+img/
+*.lyrdb
+generated_defines.svh
+
+# Added GF180 stuff
+sim_build_*/
+results.xml
+macro_instances.txt
 
 # Generated Verilog/SystemVerilog
 *.sv2v.v
@@ -24,35 +32,10 @@ Thumbs.db
 *.tmp
 *.bak
 
-# synth_sv
-synth/*.log
-synth/*.asc
-synth/*.bit
-synth/*.json
-librelane/runs/
-
-# GF180 stuff
-__pycache__/
-gf180mcu/
-gf180_drc.lyrdb
-sim_build/
-sim_build_*/
-final/
-img/
-*.lyrdb
-results.xml
-macro_instances.txt
-
-# Parallel GLS run artifacts (one set per gesture)
-logs/
-
-.sbt-global/
-build/
-project/
-src/rtl/
-target/
-
 # cocotb
 cocotb/*.sdf
 cocotb/sdf/
 cocotb/*.txt
+
+# Parallel GLS run artifacts (one set per gesture)
+logs/

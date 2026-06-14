@@ -642,4 +642,3 @@ async def test_pending_event_on_force_rollover_cycle(dut):
     # appears in the correct bin of the readout window.
     for i in range(READOUT_BINS - 1):
         await rotate_and_check(dut, model, f"pending-flush-{i}")
-
