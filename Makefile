@@ -5,8 +5,43 @@ TOP = chip_top
 
 PDK_ROOT ?= $(MAKEFILE_DIR)/gf180mcu
 PDK ?= gf180mcuD
-PDK_TAG ?= 1.8.0
+PDK_COMMIT ?= f6bfbd4d3d23c4236ff1f36126489ee59aa35cbd
+
+# Available SCL libraries:
+# gf180mcu_as_sc_mcu7t3v3
+# gf180mcu_fd_sc_mcu7t5v0
+# gf180mcu_fd_sc_mcu9t5v0
+# gf180mcu_osu_sc_gp9t3v3 (broken)
+# gf180mcu_osu_sc_gp12t3v3 (broken)
+
+ifeq ($(SCL),default)
+    SCL = gf180mcu_as_sc_mcu7t3v3
+endif
 SCL ?= gf180mcu_as_sc_mcu7t3v3
+
+# Available PAD libraries:
+# gf180mcu_fd_io
+# gf180mcu_ocd_io
+
+ifeq ($(PAD),default)
+    PAD = gf180mcu_fd_io
+endif
+PAD ?= gf180mcu_fd_io
+
+# Available SRAM macros:
+# gf180mcu_fd_ip_sram
+# gf180mcu_ocd_ip_sram
+
+ifeq ($(SRAM),default)
+    SRAM = gf180mcu_ocd_ip_sram
+endif
+SRAM ?= gf180mcu_ocd_ip_sram
+
+ifeq ($(SRAM),gf180mcu_fd_ip_sram)
+    MACROS = 5v
+else
+    MACROS = 3v3
+endif
 
 AVAILABLE_SLOTS = 1x1 0p5x1 1x0p5 0p5x0p5
 DEFAULT_SLOT = 1x1
@@ -22,7 +57,38 @@ ifeq ($(filter $(SLOT),$(AVAILABLE_SLOTS)),)
     $(error $(SLOT) does not exist in AVAILABLE_SLOTS: $(AVAILABLE_SLOTS))
 endif
 
+SLOT_DEFINE = SLOT_$(shell echo $(SLOT) | tr '[:lower:]' '[:upper:]')
+SRAM_DEFINE = SRAM_$(SRAM)
+
+LIBRELANE_OPTS = --pdk ${PDK} --pdk-root ${PDK_ROOT} --manual-pdk --scl ${SCL} --pad ${PAD}
+LIBRELANE_CONFIGS = librelane/slots/slot_${SLOT}.yaml librelane/macros/macros_${MACROS}.yaml librelane/config.yaml
+
 .DEFAULT_GOAL := help
+
+### BEGIN CUSTOM CHANGES ----------------------------------------------------------------------
+# Source lists for sim-chip-top-sanity (Makefile.sim path, no chip_top_tb.py runner).
+CHIP_TOP_SRCS := \
+    $(MAKEFILE_DIR)/src/chip_top.sv \
+    $(MAKEFILE_DIR)/src/chip_core.sv \
+    $(MAKEFILE_DIR)/src/soc.sv \
+    $(MAKEFILE_DIR)/src/spi_wrapper.sv \
+    $(MAKEFILE_DIR)/src/control_fsm.sv \
+    $(MAKEFILE_DIR)/src/evt2_decoder.sv \
+    $(MAKEFILE_DIR)/src/sram_wrapper.sv \
+    $(MAKEFILE_DIR)/src/input_fifo.sv \
+    $(MAKEFILE_DIR)/src/selectable_debug.sv \
+    $(MAKEFILE_DIR)/src/voxel_bin_core.sv \
+    $(MAKEFILE_DIR)/src/voxel_binning.sv \
+    $(MAKEFILE_DIR)/src/voxel_gesture_classifier.sv \
+    $(MAKEFILE_DIR)/src/voxel_mac_engine.sv \
+    $(MAKEFILE_DIR)/third_party/verilog_spi/spi_module.v \
+    $(MAKEFILE_DIR)/third_party/verilog_spi/pos_edge_det.v \
+    $(MAKEFILE_DIR)/third_party/verilog_spi/neg_edge_det.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__marker/vh/gf180mcu_ws_ip__marker.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__qrcode_id/vh/gf180mcu_ws_ip__qrcode_id.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__shuttle_id/vh/gf180mcu_ws_ip__shuttle_id.v \
+    $(MAKEFILE_DIR)/ip/gf180mcu_ws_ip__project_id/vh/gf180mcu_ws_ip__project_id.v
 
 # Select design to test
 SIM_DUTS = $(strip $(DUT))
@@ -37,6 +103,7 @@ CONFIG_FILE := configs/$(CONFIG).txt
 # Default testbench module name is <DUT>_tb, but you can override it:
 # Example: make sim DUT=voxel_bin_core_parallel TB=voxel_bin_core
 TB ?= $(DUT)
+### END CUSTOM CHANGES ------------------------------------------------------------
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -48,65 +115,63 @@ help: ## Show this help message
 all: librelane ## Build the project (runs LibreLane)
 .PHONY: all
 
-clone-pdk: ## Clone the GF180MCU PDK repository
-	rm -rf $(MAKEFILE_DIR)/gf180mcu
-	git clone https://github.com/wafer-space/gf180mcu.git $(MAKEFILE_DIR)/gf180mcu --depth 1 --branch ${PDK_TAG}
+$(PDK_ROOT)/ciel/gf180mcu/versions/$(PDK_COMMIT)/$(PDK):
+	ciel enable $(PDK_COMMIT) --pdk-root $(PDK_ROOT) --pdk-family $(PDK) --include-libraries all
+
+clone-pdk: $(PDK_ROOT)/ciel/gf180mcu/versions/$(PDK_COMMIT)/$(PDK) ## Clone the gf180mcu PDK
 .PHONY: clone-pdk
 
-install-3v3-scl: ## Install the 3.3V standard cell library into the PDK
-	git submodule update --init libs/gf180mcu_as_sc_mcu7t3v3 libs/gf180mcu_ocd_ip_sram
-	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.ref/gf180mcu_as_sc_mcu7t3v3 $(PDK_ROOT)/$(PDK)/libs.ref/
-	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.tech/librelane $(PDK_ROOT)/$(PDK)/libs.tech/
-	cp -r $(MAKEFILE_DIR)/libs/gf180mcu_as_sc_mcu7t3v3/pdk/libs.tech/magic $(PDK_ROOT)/$(PDK)/libs.tech/
-	cp $(MAKEFILE_DIR)/librelane/gf180mcu_as_sc_mcu7t3v3_config.tcl $(PDK_ROOT)/$(PDK)/libs.tech/librelane/gf180mcu_as_sc_mcu7t3v3/config.tcl
-.PHONY: install-3v3-scl
-
-config-pdk:
+# NEW ------------------------------------------------------------
+config-pdk: ## Clone the gf180mcu PDK, pull test files, and pulls third party spi
 	$(MAKE) clone-pdk
-	$(MAKE) install-3v3-scl
 	git lfs pull
 	git submodule update --init third_party/verilog_spi
 .PHONY: config-pdk
+# ----------------------------------------------------------------
 
-librelane: ## Run LibreLane flow (synthesis, PnR, verification)
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk
+# Need to find a better way to
+# pass the variables to LibreLane
+defines:
+	@echo "Writing src/generated_defines.svh"
+	@printf '// This file is auto-generated by the Makefile\n`define ${SLOT_DEFINE}\n`define ${SRAM_DEFINE}\n' \
+	  > $(MAKEFILE_DIR)/src/generated_defines.svh
+.PHONY: defines
+
+librelane: clone-pdk defines ## Run LibreLane flow (synthesis, PnR, verification)
+	SRAM_DEFINE=${SRAM_DEFINE} librelane ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --save-views-to $(MAKEFILE_DIR)/final
 .PHONY: librelane
 
-librelane-nodrc: ## Run LibreLane flow without DRC checks
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip KLayout.Antenna --skip KLayout.DRC --skip Magic.DRC
+librelane-condensed: clone-pdk defines ## Run LibreLane flow (synthesis, PnR, verification)
+	SRAM_DEFINE=${SRAM_DEFINE} librelane --condensed ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --save-views-to $(MAKEFILE_DIR)/final
+.PHONY: librelane-condensed
+
+librelane-nodrc: clone-pdk defines ## Run LibreLane flow without DRC checks
+	SRAM_DEFINE=${SRAM_DEFINE} librelane ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --save-views-to $(MAKEFILE_DIR)/final --skip KLayout.Antenna --skip KLayout.DRC --skip Magic.DRC
 .PHONY: librelane-nodrc
 
-librelane-klayoutdrc: ## Run LibreLane flow without magic DRC checks
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip Magic.DRC
+librelane-klayoutdrc: clone-pdk defines ## Run LibreLane flow without magic DRC checks
+	SRAM_DEFINE=${SRAM_DEFINE} librelane ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --save-views-to $(MAKEFILE_DIR)/final --skip Magic.DRC
 .PHONY: librelane-klayoutdrc
 
-librelane-magicdrc: ## Run LibreLane flow without KLayout DRC checks
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --save-views-to $(MAKEFILE_DIR)/final --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --skip KLayout.DRC
+librelane-magicdrc: clone-pdk defines ## Run LibreLane flow without KLayout DRC checks
+	SRAM_DEFINE=${SRAM_DEFINE} librelane ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --save-views-to $(MAKEFILE_DIR)/final --skip KLayout.DRC
 .PHONY: librelane-magicdrc
 
-librelane-openroad: ## Open the last run in OpenROAD
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --last-run --flow OpenInOpenROAD
+librelane-openroad: clone-pdk defines ## Open the last run in OpenROAD
+	SRAM_DEFINE=${SRAM_DEFINE} librelane ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --last-run --flow OpenInOpenROAD
 .PHONY: librelane-openroad
 
-librelane-klayout: ## Open the last run in KLayout
-	librelane librelane/slots/slot_${SLOT}.yaml librelane/config.yaml --pdk ${PDK} --pdk-root ${PDK_ROOT} --scl ${SCL} --manual-pdk --last-run --flow OpenInKLayout
+librelane-klayout: clone-pdk defines ## Open the last run in KLayout
+	SRAM_DEFINE=${SRAM_DEFINE} librelane ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS} --last-run --flow OpenInKLayout
 .PHONY: librelane-klayout
 
-librelane-padring: ## Only create the padring
-	PDK_ROOT=${PDK_ROOT} PDK=${PDK} python3 scripts/padring.py librelane/slots/slot_${SLOT}.yaml librelane/config.yaml
+librelane-padring: clone-pdk defines ## Only create the padring
+	python3 scripts/padring.py ${LIBRELANE_CONFIGS} ${LIBRELANE_OPTS}
 .PHONY: librelane-padring
 
-lint: ## Lint all SystemVerilog files in src
-	verilator --lint-only \
-	          -Wall \
-	          -Wno-fatal \
-	          -flife lint.vlt \
-	          $(SV_SRCS)
-.PHONY: lint
-
-sim: ## Run RTL simulation (no DUT or DUT=chip_top → chip_top sanity check; else run named DUT)
+sim: $(PDK_ROOT)/$(PDK) defines ## Run RTL simulation with cocotb (DUT=chip_top runs chip_top tb)
 	@if [ -z "$(DUT)" ]; then \
-		$(MAKE) sim-chip-top; \
+		$(MAKE) sim-chip-top-sanity; \
 	elif [ "$(DUT)" = "chip_top" ]; then \
 		$(MAKE) sim-chip-top; \
 	else \
@@ -143,56 +208,27 @@ sim-all: ## Test all the modules against Makefile compile args
 	$(MAKE) sim DUT=sram_wrapper CONFIG=sram_wrapper
 	$(MAKE) sim DUT=input_fifo
 	$(MAKE) sim DUT=evt2_decoder
+	$(MAKE) sim DUT=control_fsm
+	$(MAKE) sim DUT=soc
+	$(MAKE) sim DUT=spi_wrapper
+	$(MAKE) sim DUT=sram_wrapper
 	$(MAKE) sim DUT=voxel_gesture_classifier
 	$(MAKE) sim DUT=voxel_mac_engine
 	$(MAKE) sim DUT=voxel_binning
 	$(MAKE) sim DUT=voxel_bin_core
+	$(MAKE) sim DUT=soc
+	$(MAKE) sim DUT=chip_top
 .PHONY: sim-all
 
-SLOT_UPPER    := $(shell echo $(SLOT) | tr 'a-z' 'A-Z')
-CHIP_TOP_SRCS := src/chip_top.sv src/chip_core.sv src/soc.sv src/spi_wrapper.sv \
-    			 src/control_fsm.sv src/evt2_decoder.sv src/sram_wrapper.sv src/input_fifo.sv \
-    			 src/selectable_debug.sv src/voxel_bin_core.sv src/voxel_binning.sv \
-    			 src/voxel_gesture_classifier.sv src/voxel_mac_engine.sv \
-    			 third_party/verilog_spi/spi_module.v third_party/verilog_spi/pos_edge_det.v third_party/verilog_spi/neg_edge_det.v \
-    			 ip/gf180mcu_ws_ip__id/vh/gf180mcu_ws_ip__id.v \
-    			 ip/gf180mcu_ws_ip__logo/vh/gf180mcu_ws_ip__logo.v
-CHIP_TOP_PDK_IO := $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v
-
-# Use real PDK IO/SRAM models when available, otherwise fall back to behavioral stubs
-CHIP_TOP_IO_SRCS := $(if $(wildcard $(CHIP_TOP_PDK_IO)),\
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_fd_io.v \
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_io/verilog/gf180mcu_ws_io.v \
-    $(PDK_ROOT)/$(PDK)/libs.ref/gf180mcu_fd_ip_sram/verilog/gf180mcu_fd_ip_sram__sram512x8m8wm1.v,\
-    sim/io_stubs.v)
-
-sim-chip-top: ## Run full chip_top RTL simulation (all tests, including classify)
-	@echo "IO sources: $(CHIP_TOP_IO_SRCS)"
-	rm -rf cocotb/sim_build/chip_top
-	TOPLEVEL=chip_top \
-	TOPLEVEL_LANG=verilog \
-	COCOTB_TEST_MODULES=chip_top_tb \
-	VERILOG_SOURCES="$(CHIP_TOP_SRCS) $(CHIP_TOP_IO_SRCS)" \
-	COMPILE_ARGS="-DSLOT_$(SLOT_UPPER) -I$(MAKEFILE_DIR)/src" \
-	WAVES=1 \
-	SIM_BUILD=cocotb/sim_build/chip_top \
-	PYTHONPATH=cocotb \
-	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
+sim-chip-top: $(PDK_ROOT)/$(PDK) defines ## Run chip_top RTL simulation with cocotb
+	cd cocotb; PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-chip-top
 
-sim-chip-top-sanity: ## Quick chip_top sanity: 2 EVT2 events + debug sweep (no LFS, CI-friendly)
-	@echo "IO sources: $(CHIP_TOP_IO_SRCS)"
-	rm -rf cocotb/sim_build/chip_top_sanity
-	TOPLEVEL=chip_top \
-	TOPLEVEL_LANG=verilog \
-	COCOTB_TEST_MODULES=chip_top_tb \
-	COCOTB_TEST_FILTER=test_sanity_evt2_and_debug \
-	VERILOG_SOURCES="$(CHIP_TOP_SRCS) $(CHIP_TOP_IO_SRCS)" \
-	COMPILE_ARGS="-DSLOT_$(SLOT_UPPER) -I$(MAKEFILE_DIR)/src" \
-	WAVES=0 \
-	SIM_BUILD=cocotb/sim_build/chip_top_sanity \
-	PYTHONPATH=cocotb \
-	make -f $$(cocotb-config --makefiles)/Makefile.sim results.xml
+sim-chip-top-sanity: $(PDK_ROOT)/$(PDK) defines ## Quick chip_top sanity: 2 EVT2 events + debug sweep (no LFS, CI-friendly)
+	cd cocotb; COCOTB_TEST_FILTER=test_sanity_evt2_and_debug WAVES=0 \
+	  SIM_BUILD=sim_build/chip_top_sanity \
+	  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} \
+	  python3 chip_top_tb.py
 .PHONY: sim-chip-top-sanity
 
 # Stage-specific GLS netlists from the latest librelane run.
@@ -200,12 +236,12 @@ GL_SYNTH_NETLIST := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/06-yosys-synthesis
 GL_FP_NETLIST    := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/13-openroad-floorplan/chip_top.pnl.v
 GL_PNR_NETLIST   := $(MAKEFILE_DIR)/librelane/runs/$(RUN_TAG)/51-openroad-fillinsertion/chip_top.pnl.v
 
-sim-gl: ## Run post-synthesis gate-level simulation with cocotb (Icarus)
-	cd cocotb; GL=1 GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+sim-gl: $(PDK_ROOT)/$(PDK) defines ## Run gate-level simulation with cocotb (uses final/pnl or latest run netlist)
+	cd cocotb; GL=1 PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-gl
 
 sim-gl-chip-top-sanity: ## Run post-synthesis GL sanity check (test_sanity_evt2_and_debug only, no waves)
-	cd cocotb; GL=1 WAVES=0 COCOTB_TEST_FILTER=test_sanity_evt2_and_debug GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} python3 chip_top_tb.py
+	cd cocotb; GL=1 WAVES=0 COCOTB_TEST_FILTER=test_sanity_evt2_and_debug GL_NETLIST=$(GL_SYNTH_NETLIST) PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-gl-chip-top-sanity
 
 sim-gl-verilator: ## Run post-synthesis gate-level simulation with Verilator (faster than Icarus)
