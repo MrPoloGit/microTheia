@@ -90,16 +90,43 @@ module voxel_binning #(
     // ------------------------------------------------------------------
     // SRAM interface wires
     // ------------------------------------------------------------------
-    logic                    sram_wr_valid;
-    logic [MEM_ADDR_BITS-1:0] sram_wr_addr;
-    logic [COUNTER_BITS-1:0] sram_wr_data;
+    logic                    sram_wr_valid, wr_valid_s;
+    logic [MEM_ADDR_BITS-1:0] sram_wr_addr, wr_addr_s;
+    logic [COUNTER_BITS-1:0] sram_wr_data, wr_data_s;
     logic                    sram_rd_valid;
     logic [MEM_ADDR_BITS-1:0] sram_rd_addr;
-    logic [COUNTER_BITS-1:0] sram_rd_data;
+    logic [COUNTER_BITS-1:0] sram_rd_data, rd_data_s;
+
+    
+    //pipeline stage to alleviate timing in slow corners
+    logic                     rd_valid_s;
+    logic [MEM_ADDR_BITS-1:0] rd_addr_s;
+    always_ff @(posedge clk) begin
+    if (rst) begin
+        wr_valid_s <= 1'b0;
+        wr_addr_s  <= '0;
+        wr_data_s  <= '0;
+
+        sram_rd_data <= '0;
+
+        rd_valid_s   <= 1'b0;
+        rd_addr_s    <= '0;
+    end else begin
+        wr_valid_s <= sram_wr_valid;
+        wr_addr_s  <= sram_wr_addr;
+        wr_data_s  <= sram_wr_data;
+
+        rd_valid_s   <= sram_rd_valid;
+        rd_addr_s    <= sram_rd_addr;
+
+        sram_rd_data <= rd_data_s;
+    end
+end
 
     sram_wrapper #(
         .width_p (COUNTER_BITS),
-        .depth_p (TOTAL_CELLS)
+        .depth_p (TOTAL_CELLS),
+        .PIPELINE_READ(1'b1)
     ) u_counter_mem (
 `ifdef USE_POWER_PINS
         .VDD        (VDD),
@@ -107,12 +134,12 @@ module voxel_binning #(
 `endif
         .clk_i      (clk),
         .reset_i    (rst),
-        .wr_valid_i (sram_wr_valid),
-        .wr_data_i  (sram_wr_data),
-        .wr_addr_i  (sram_wr_addr),
-        .rd_valid_i (sram_rd_valid),
-        .rd_addr_i  (sram_rd_addr),
-        .rd_data_o  (sram_rd_data)
+        .wr_valid_i (wr_valid_s),
+        .wr_data_i  (wr_data_s),
+        .wr_addr_i  (wr_addr_s),
+        .rd_valid_i (rd_valid_s),
+        .rd_addr_i  (rd_addr_s),
+        .rd_data_o  (rd_data_s)
     );
 
     // ------------------------------------------------------------------
