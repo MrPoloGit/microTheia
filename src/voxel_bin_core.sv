@@ -443,7 +443,7 @@ module voxel_bin_core #(
             mac_weight_flat_s <= mac_weight_flat;
             mac_weight_flat_s_s <= mac_weight_flat_s;
             feature_rd_data_s <= feature_rd_data;
-            feature_rd_data_s_s <= feature_rd_data;
+            feature_rd_data_s_s <= feature_rd_data_s;
         end    
     end    
     voxel_mac_engine #(
