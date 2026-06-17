@@ -83,8 +83,8 @@ CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 15.625 # 64 MHz
 
 # Fix hold violations
-PL_RESIZER_HOLD_SLACK_MARGIN: 0.4
-GRT_RESIZER_HOLD_SLACK_MARGIN: 0.35
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.30
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.25
 
 # Increase for more logic on your die
 PL_TARGET_DENSITY_PCT: 40 # 35 best so far for ver 2.0
@@ -199,10 +199,10 @@ CTS_SINK_CLUSTERING_MAX_DIAMETER: 25      # default: None
 CTS_CLK_MAX_WIRE_LENGTH: 450             # default: 0 best so far is 450 with 109 max cap violations spread between clk net and wires. 200 is only wire vios but thin hold/setup. unconstrained is mostly only clk net. 500 = 115 cap, mostly clk, good setup/hold
 
 # buffer long nets during design repair
-DESIGN_REPAIR_MAX_WIRE_LENGTH: 250       # default: 0 um 
+# DESIGN_REPAIR_MAX_WIRE_LENGTH: 250       # default: 0 um 
 
 # same but after global routing when wire estimates are more realistic
-GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200   # default: 0 µm
+# GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH: 200   # default: 0 µm
 
 CTS_SINK_BUFFER_MAX_CAP_DERATE_PCT: 25  # default: None, smaller numbers means prefer larger buffers i think? so far 25 best w/102 cap vios & good slack
 

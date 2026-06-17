@@ -108,7 +108,7 @@ module voxel_bin_core #(
 
     logic                    feature_rd_valid;
     logic [FEATURE_BITS-1:0] feature_rd_addr;
-    logic [COUNTER_BITS-1:0] feature_rd_data, feature_rd_data_s; // _s flop to break long paths across chip
+    logic [COUNTER_BITS-1:0] feature_rd_data, feature_rd_data_s, feature_rd_data_s_s; // _s flop to break long paths across chip
 
     logic [FEATURE_BITS-1:0] weight_rd_addr;
     logic                    weight_rd_valid;
@@ -119,7 +119,7 @@ module voxel_bin_core #(
     logic                               mac_busy;
     logic                               mac_rd_en;
     logic [FEATURE_BITS-1:0]            mac_rd_addr;
-    logic [NUM_CLASSES*WEIGHT_BITS-1:0] mac_weight_flat, mac_weight_flat_s; // _s flop same as above
+    logic [NUM_CLASSES*WEIGHT_BITS-1:0] mac_weight_flat, mac_weight_flat_s, mac_weight_flat_s_s; // _s flop same as above
     logic [NUM_CLASSES*SCORE_BITS-1:0]  mac_scores_flat;
     logic                               mac_scores_valid;
 
@@ -344,7 +344,8 @@ module voxel_bin_core #(
     // ------------------------------------------------------------------
     sram_wrapper #(
         .width_p(COUNTER_BITS),
-        .depth_p(FEATURE_COUNT)
+        .depth_p(FEATURE_COUNT),
+        .PIPELINE_READ(1'b1)
     ) u_feature_ram (
 `ifdef USE_POWER_PINS
         .VDD        (VDD),
@@ -363,12 +364,14 @@ module voxel_bin_core #(
     // ------------------------------------------------------------------
     // Weight SRAMs x NUM_CLASSES (writable at runtime via weight_wr_* ports)
     // ------------------------------------------------------------------
+    
     genvar g;
     generate
         for (g = 0; g < NUM_CLASSES; g++) begin : gen_weight_ram
             sram_wrapper #(
                 .width_p(WEIGHT_BITS),
-                .depth_p(FEATURE_COUNT)
+                .depth_p(FEATURE_COUNT),
+                .PIPELINE_READ(1'b1)
             ) u_weight_ram (
 `ifdef USE_POWER_PINS
                 .VDD        (VDD),
@@ -389,6 +392,20 @@ module voxel_bin_core #(
     // ------------------------------------------------------------------
     // Threshold SRAM (writable at runtime; addr 0-3 = class, 4-7 = diff)
     // ------------------------------------------------------------------
+
+    //adding pipeline stage to alleviate timing
+
+
+
+    logic [SCORE_BITS-1:0] thresh_data_s;
+
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            thresh_data     <= '0;
+        end else begin
+            thresh_data     <= thresh_data_s;
+        end
+    end
     sram_wrapper #(
         .width_p(SCORE_BITS),
         .depth_p(2 * NUM_CLASSES)
@@ -404,8 +421,9 @@ module voxel_bin_core #(
         .wr_addr_i  (dec_thresh_5xaddr_o),
         .rd_valid_i (thresh_rd_valid),
         .rd_addr_i  (thresh_rd_addr),
-        .rd_data_o  (thresh_data)
+        .rd_data_o  (thresh_data_s)
     );
+
 
     // ------------------------------------------------------------------
     // MAC engine
@@ -417,11 +435,15 @@ module voxel_bin_core #(
     always_ff @(posedge clk) begin
         if(rst) begin
             mac_weight_flat_s <= '0;
+            mac_weight_flat_s_s <= '0;
             feature_rd_data_s <= '0;
+            feature_rd_data_s_s <= '0;
         end
         else begin
             mac_weight_flat_s <= mac_weight_flat;
+            mac_weight_flat_s_s <= mac_weight_flat_s;
             feature_rd_data_s <= feature_rd_data;
+            feature_rd_data_s_s <= feature_rd_data_s;
         end    
     end    
     voxel_mac_engine #(
@@ -437,8 +459,8 @@ module voxel_bin_core #(
         .busy             (mac_busy),
         .rd_en            (mac_rd_en),
         .rd_addr          (mac_rd_addr),
-        .feature_data     (feature_rd_data_s), 
-        .weight_data_flat (mac_weight_flat_s), 
+        .feature_data     (feature_rd_data_s_s), 
+        .weight_data_flat (mac_weight_flat_s_s), 
         .scores_flat      (mac_scores_flat),
         .scores_valid     (mac_scores_valid),
         .mac_dbg          (mac_dbg),

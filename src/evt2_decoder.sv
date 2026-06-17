@@ -26,30 +26,38 @@ module evt2_decoder #(
     input  logic                             data_valid,
     input  logic                             event_ready_i,
     input  logic                             evt_ld_en,
+
     output logic                             data_ready,
+
     output logic [$clog2(GRID_SIZE)-1:0]     x_out,
     output logic [$clog2(GRID_SIZE)-1:0]     y_out,
     output logic                             event_valid,
     output logic                             evt_reads_done,
+
     output logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_o,
     output logic [WEIGHT_BITS-1:0]           weight_data_o,
     output logic [5:0]                       weight_sram_addr_o,
     output logic                             weight_event_valid,
+
     output logic [SCORE_BITS-1:0]            thresh_data_o,
     output logic [2:0]                       thresh_addr_o,
     output logic                             thresh_event_valid,
+
     output logic [33:0]                      ts_out,
     output logic [33:0]                      bin_length_us,
     output logic                             bin_length_valid,
+
     output logic                             debug_req_o,
     output logic                             reload_req_o,
     output logic                             boot_req_o,
+
     output logic [11:0]                      decoder_dbg,
     output logic [31:0]                      decoder_output_dbg,
     output logic [3:0]                       debug_page_sel
 );
 
     localparam int GRID_BITS  = $clog2(GRID_SIZE);
+
     localparam logic [3:0] EVT_CD_OFF     = 4'h0;
     localparam logic [3:0] EVT_CD_ON      = 4'h1;
     localparam logic [3:0] EVT_WEIGHT     = 4'h2;
@@ -70,7 +78,9 @@ module evt2_decoder #(
     localparam int SENSOR_W_M1 = SENSOR_WIDTH  - 1;
     localparam int SENSOR_H_M1 = SENSOR_HEIGHT - 1;
 
-    // Input decode
+    // ------------------------------------------------------------------
+    // Input decode.
+    // ------------------------------------------------------------------
     wire [31:0] evt_word = SWAP_INPUT_BYTES
                          ? {data_in[7:0], data_in[15:8], data_in[23:16], data_in[31:24]}
                          : data_in;
@@ -80,19 +90,23 @@ module evt2_decoder #(
     wire [10:0] y_raw    = evt_word[10:0];
     wire        is_cd    = (pkt_type == EVT_CD_OFF) || (pkt_type == EVT_CD_ON);
 
-    // Grid coordinate combinational logic
-    logic [10:0]          x_clamped,   y_clamped;
-    logic [GRID_BITS-1:0] x_grid,      y_grid;
-    logic [10:0]                      xbound_q [0:15];
-    logic [10:0]                      xbound_d [0:15];
-    logic [10:0]                      ybound_q [0:15];
-    logic [10:0]                      ybound_d [0:15];
+    // ------------------------------------------------------------------
+    // Grid coordinate combinational logic.
+    // ------------------------------------------------------------------
+    logic [10:0]          x_clamped, y_clamped;
+    logic [GRID_BITS-1:0] x_grid, y_grid;
+
+    logic [10:0] xbound_q [0:15];
+    logic [10:0] xbound_d [0:15];
+    logic [10:0] ybound_q [0:15];
+    logic [10:0] ybound_d [0:15];
 
     always_comb begin
-        x_clamped  = (x_raw >= 11'(SENSOR_WIDTH))  ? SENSOR_W_M1[10:0] : x_raw;
-        y_clamped  = (y_raw >= 11'(SENSOR_HEIGHT)) ? SENSOR_H_M1[10:0] : y_raw;
-        x_grid     = 4'd15;
-        y_grid     = 4'd15;
+        x_clamped = (x_raw >= 11'(SENSOR_WIDTH))  ? SENSOR_W_M1[10:0] : x_raw;
+        y_clamped = (y_raw >= 11'(SENSOR_HEIGHT)) ? SENSOR_H_M1[10:0] : y_raw;
+
+        x_grid = 4'd15;
+        y_grid = 4'd15;
 
         for (int i = 0; i < 15; i++) begin
             if (x_clamped <= xbound_q[i] && x_grid == 4'd15)
@@ -105,64 +119,143 @@ module evt2_decoder #(
         end
     end
 
-    // Backpressure
-    assign data_ready = (!is_cd) || event_ready_i;
+    // ------------------------------------------------------------------
+    // Backpressure.
+    //
+    // IMPORTANT:
+    // data_ready is intentionally NOT passed through the added output
+    // pipeline stage. It is a ready/backpressure handshake signal used to
+    // decide whether the current input word is accepted this cycle.
+    //
+    // Registering data_ready would make the visible ready signal refer to
+    // the previous cycle's packet type / event_ready_i state, which can
+    // break the valid-ready transaction semantics.
+    // ------------------------------------------------------------------
+    logic data_ready_c;
 
-    // State registers (_q) and next-state signals (_d)
+    assign data_ready_c = (!is_cd) || event_ready_i;
+    assign data_ready   = data_ready_c;
+
+    // ------------------------------------------------------------------
+    // State registers (_q) and next-state signals (_d).
+    // These are the original decoder state/output registers.
+    // ------------------------------------------------------------------
     logic                             have_time_high_q,       have_time_high_d;
     logic [27:0]                      time_high_reg_q,        time_high_reg_d;
+
     logic [GRID_BITS-1:0]             x_out_q,                x_out_d;
     logic [GRID_BITS-1:0]             y_out_q,                y_out_d;
     logic [33:0]                      ts_out_q,               ts_out_d;
     logic                             event_valid_q,          event_valid_d;
+
     logic                             weight_event_valid_q,   weight_event_valid_d;
     logic                             thresh_event_valid_q,   thresh_event_valid_d;
     logic                             evt_reads_done_q,       evt_reads_done_d;
+
     logic [18:0]                      thresh_reg_q,           thresh_reg_d;
+
     logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_q,          weight_addr_d;
     logic [WEIGHT_BITS-1:0]           weight_data_q,          weight_data_d;
     logic [5:0]                       weight_sram_addr_q,     weight_sram_addr_d;
+
     logic [SCORE_BITS-1:0]            thresh_data_q,          thresh_data_d;
     logic [2:0]                       thresh_addr_q,          thresh_addr_d;
+
     logic [3:0]                       debug_page_sel_q,       debug_page_sel_d;
     logic                             boot_req_q,             boot_req_d;
     logic                             reload_req_q,           reload_req_d;
     logic                             debug_req_q,            debug_req_d;
+
     logic [33:0]                      bin_length_us_q,        bin_length_us_d;
     logic                             bin_length_valid_q,     bin_length_valid_d;
     logic [16:0]                      bin_length_reg_q,       bin_length_reg_d;
 
-    // Next-state combinational block
+    // ------------------------------------------------------------------
+    // NEW: Added internal output pipeline registers.
+    //
+    // These registers add one extra timing boundary between the decoder's
+    // internal decoded state (_q) and the module output ports.
+    //
+    // External port names stay exactly the same:
+    //   x_out, y_out, event_valid, ts_out, weight_*, thresh_*, etc.
+    //
+    // Functional effect:
+    //   all decoded output payloads and one-cycle pulses leave this module
+    //   one clock later than before, but stay aligned with their valid pulse.
+    // ------------------------------------------------------------------
+    logic [GRID_BITS-1:0]             x_out_pipe_q;
+    logic [GRID_BITS-1:0]             y_out_pipe_q;
+    logic [33:0]                      ts_out_pipe_q;
+    logic                             event_valid_pipe_q;
+
+    logic                             evt_reads_done_pipe_q;
+
+    logic [$clog2(FEATURE_COUNT)-1:0] weight_addr_pipe_q;
+    logic [WEIGHT_BITS-1:0]           weight_data_pipe_q;
+    logic [5:0]                       weight_sram_addr_pipe_q;
+    logic                             weight_event_valid_pipe_q;
+
+    logic [SCORE_BITS-1:0]            thresh_data_pipe_q;
+    logic [2:0]                       thresh_addr_pipe_q;
+    logic                             thresh_event_valid_pipe_q;
+
+    logic [33:0]                      bin_length_us_pipe_q;
+    logic                             bin_length_valid_pipe_q;
+
+    logic                             debug_req_pipe_q;
+    logic                             reload_req_pipe_q;
+    logic                             boot_req_pipe_q;
+
+    logic [3:0]                       debug_page_sel_pipe_q;
+    logic [11:0]                      decoder_dbg_pipe_q;
+    logic [31:0]                      decoder_output_dbg_pipe_q;
+
+    // ------------------------------------------------------------------
+    // Next-state combinational block.
+    // ------------------------------------------------------------------
     always_comb begin
-        // Default: hold state, clear pulse signals
+        // Default: hold state, clear pulse signals.
         have_time_high_d     = have_time_high_q;
         time_high_reg_d      = time_high_reg_q;
+
         x_out_d              = x_out_q;
         y_out_d              = y_out_q;
         ts_out_d             = ts_out_q;
+
         event_valid_d        = 1'b0;
         weight_event_valid_d = 1'b0;
         thresh_event_valid_d = 1'b0;
         evt_reads_done_d     = 1'b0;
+
         thresh_reg_d         = thresh_reg_q;
+
         weight_addr_d        = weight_addr_q;
         weight_data_d        = weight_data_q;
         weight_sram_addr_d   = weight_sram_addr_q;
+
         thresh_data_d        = thresh_data_q;
         thresh_addr_d        = thresh_addr_q;
+
         debug_page_sel_d     = debug_page_sel_q;
+
         boot_req_d           = 1'b0;
         reload_req_d         = 1'b0;
         debug_req_d          = 1'b0;
+
         bin_length_us_d      = bin_length_us_q;
         bin_length_valid_d   = 1'b0;
         bin_length_reg_d     = bin_length_reg_q;
+
         for (int i = 0; i < 16; i++) begin
             xbound_d[i] = xbound_q[i];
             ybound_d[i] = ybound_q[i];
         end
 
-        if (data_valid && data_ready) begin
+        // CHANGED:
+        // Use data_ready_c internally instead of the output port data_ready.
+        // data_ready is still assigned to data_ready_c, but this keeps the
+        // decoder accept condition clearly tied to the current-cycle ready.
+        if (data_valid && data_ready_c) begin
             case (pkt_type)
                 EVT_TIME_HIGH: begin
                     have_time_high_d = 1'b1;
@@ -196,8 +289,8 @@ module evt2_decoder #(
 
                 EVT_THRESH_L: begin
                     if (evt_ld_en) begin
-                        thresh_data_d       = {thresh_reg_q, evt_word[27:10]};
-                        thresh_addr_d       = evt_word[9:7];
+                        thresh_data_d        = {thresh_reg_q, evt_word[27:10]};
+                        thresh_addr_d        = evt_word[9:7];
                         thresh_event_valid_d = 1'b1;
                     end
                 end
@@ -251,58 +344,78 @@ module evt2_decoder #(
         end
     end
 
-    // Register block: _d -> _q on clock edge
+    // ------------------------------------------------------------------
+    // Register block: _d -> _q on clock edge.
+    // ------------------------------------------------------------------
     always_ff @(posedge clk) begin
         if (rst) begin
-            have_time_high_q    <= 1'b0;
-            time_high_reg_q     <= '0;
-            x_out_q             <= '0;
-            y_out_q             <= '0;
-            ts_out_q            <= '0;
-            event_valid_q       <= 1'b0;
+            have_time_high_q     <= 1'b0;
+            time_high_reg_q      <= '0;
+
+            x_out_q              <= '0;
+            y_out_q              <= '0;
+            ts_out_q             <= '0;
+
+            event_valid_q        <= 1'b0;
             weight_event_valid_q <= 1'b0;
             thresh_event_valid_q <= 1'b0;
-            evt_reads_done_q    <= 1'b0;
-            thresh_reg_q        <= '0;
-            weight_addr_q       <= '0;
-            weight_data_q       <= '0;
-            weight_sram_addr_q  <= '0;
-            thresh_data_q       <= '0;
-            thresh_addr_q       <= '0;
-            debug_page_sel_q    <= '0;
-            boot_req_q          <= 1'b0;
-            reload_req_q        <= 1'b0;
-            debug_req_q         <= 1'b0;
-            bin_length_us_q     <= '0;
-            bin_length_valid_q  <= 1'b0;
-            bin_length_reg_q    <= '0;
+            evt_reads_done_q     <= 1'b0;
+
+            thresh_reg_q         <= '0;
+
+            weight_addr_q        <= '0;
+            weight_data_q        <= '0;
+            weight_sram_addr_q   <= '0;
+
+            thresh_data_q        <= '0;
+            thresh_addr_q        <= '0;
+
+            debug_page_sel_q     <= '0;
+
+            boot_req_q           <= 1'b0;
+            reload_req_q         <= 1'b0;
+            debug_req_q          <= 1'b0;
+
+            bin_length_us_q      <= '0;
+            bin_length_valid_q   <= 1'b0;
+            bin_length_reg_q     <= '0;
+
             for (int i = 0; i < 16; i++) begin
                 xbound_q[i] <= (i * 20 + 19);
                 ybound_q[i] <= (i * 20 + 19);
             end
         end else begin
-            have_time_high_q    <= have_time_high_d;
-            time_high_reg_q     <= time_high_reg_d;
-            x_out_q             <= x_out_d;
-            y_out_q             <= y_out_d;
-            ts_out_q            <= ts_out_d;
-            event_valid_q       <= event_valid_d;
+            have_time_high_q     <= have_time_high_d;
+            time_high_reg_q      <= time_high_reg_d;
+
+            x_out_q              <= x_out_d;
+            y_out_q              <= y_out_d;
+            ts_out_q             <= ts_out_d;
+
+            event_valid_q        <= event_valid_d;
             weight_event_valid_q <= weight_event_valid_d;
             thresh_event_valid_q <= thresh_event_valid_d;
-            evt_reads_done_q    <= evt_reads_done_d;
-            thresh_reg_q        <= thresh_reg_d;
-            weight_addr_q       <= weight_addr_d;
-            weight_data_q       <= weight_data_d;
-            weight_sram_addr_q  <= weight_sram_addr_d;
-            thresh_data_q       <= thresh_data_d;
-            thresh_addr_q       <= thresh_addr_d;
-            debug_page_sel_q    <= debug_page_sel_d;
-            boot_req_q          <= boot_req_d;
-            reload_req_q        <= reload_req_d;
-            debug_req_q         <= debug_req_d;
-            bin_length_us_q     <= bin_length_us_d;
-            bin_length_valid_q  <= bin_length_valid_d;
-            bin_length_reg_q    <= bin_length_reg_d;
+            evt_reads_done_q     <= evt_reads_done_d;
+
+            thresh_reg_q         <= thresh_reg_d;
+
+            weight_addr_q        <= weight_addr_d;
+            weight_data_q        <= weight_data_d;
+            weight_sram_addr_q   <= weight_sram_addr_d;
+
+            thresh_data_q        <= thresh_data_d;
+            thresh_addr_q        <= thresh_addr_d;
+
+            debug_page_sel_q     <= debug_page_sel_d;
+
+            boot_req_q           <= boot_req_d;
+            reload_req_q         <= reload_req_d;
+            debug_req_q          <= debug_req_d;
+
+            bin_length_us_q      <= bin_length_us_d;
+            bin_length_valid_q   <= bin_length_valid_d;
+            bin_length_reg_q     <= bin_length_reg_d;
+
             for (int i = 0; i < 16; i++) begin
                 xbound_q[i] <= xbound_d[i];
                 ybound_q[i] <= ybound_d[i];
@@ -310,27 +423,125 @@ module evt2_decoder #(
         end
     end
 
-    // Output assignments: _q -> module outputs
-    assign x_out              = x_out_q;
-    assign y_out              = y_out_q;
-    assign ts_out             = ts_out_q;
-    assign event_valid        = event_valid_q;
-    assign weight_event_valid = weight_event_valid_q;
-    assign thresh_event_valid = thresh_event_valid_q;
-    assign evt_reads_done     = evt_reads_done_q;
-    assign weight_addr_o      = weight_addr_q;
-    assign weight_data_o      = weight_data_q;
-    assign weight_sram_addr_o = weight_sram_addr_q;
-    assign thresh_data_o      = thresh_data_q;
-    assign thresh_addr_o      = thresh_addr_q;
-    assign debug_page_sel     = debug_page_sel_q;
-    assign boot_req_o         = boot_req_q;
-    assign reload_req_o       = reload_req_q;
-    assign debug_req_o        = debug_req_q;
-    assign bin_length_us      = bin_length_us_q;
-    assign bin_length_valid   = bin_length_valid_q;
+    // ------------------------------------------------------------------
+    // NEW: Output pipeline register block.
+    //
+    // This is the added timing stage requested. It registers every decoded
+    // output signal before it leaves the module, while keeping all external
+    // port names unchanged.
+    //
+    // data_ready is intentionally excluded, because it is current-cycle
+    // backpressure/handshake, not a decoded output payload.
+    // ------------------------------------------------------------------
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            x_out_pipe_q              <= '0;
+            y_out_pipe_q              <= '0;
+            ts_out_pipe_q             <= '0;
+            event_valid_pipe_q        <= 1'b0;
 
-    assign decoder_dbg        = {event_ready_i, data_valid, y_out_q, x_out_q, event_valid_q, data_ready};
-    assign decoder_output_dbg = ts_out_q[31:0];
+            evt_reads_done_pipe_q     <= 1'b0;
+
+            weight_addr_pipe_q        <= '0;
+            weight_data_pipe_q        <= '0;
+            weight_sram_addr_pipe_q   <= '0;
+            weight_event_valid_pipe_q <= 1'b0;
+
+            thresh_data_pipe_q        <= '0;
+            thresh_addr_pipe_q        <= '0;
+            thresh_event_valid_pipe_q <= 1'b0;
+
+            bin_length_us_pipe_q      <= '0;
+            bin_length_valid_pipe_q   <= 1'b0;
+
+            debug_req_pipe_q          <= 1'b0;
+            reload_req_pipe_q         <= 1'b0;
+            boot_req_pipe_q           <= 1'b0;
+
+            debug_page_sel_pipe_q     <= '0;
+            decoder_dbg_pipe_q        <= '0;
+            decoder_output_dbg_pipe_q <= '0;
+        end else begin
+            // Event/CD outputs.
+            x_out_pipe_q              <= x_out_q;
+            y_out_pipe_q              <= y_out_q;
+            ts_out_pipe_q             <= ts_out_q;
+            event_valid_pipe_q        <= event_valid_q;
+
+            // Readout-control pulse.
+            evt_reads_done_pipe_q     <= evt_reads_done_q;
+
+            // Weight-load outputs.
+            weight_addr_pipe_q        <= weight_addr_q;
+            weight_data_pipe_q        <= weight_data_q;
+            weight_sram_addr_pipe_q   <= weight_sram_addr_q;
+            weight_event_valid_pipe_q <= weight_event_valid_q;
+
+            // Threshold-load outputs.
+            thresh_data_pipe_q        <= thresh_data_q;
+            thresh_addr_pipe_q        <= thresh_addr_q;
+            thresh_event_valid_pipe_q <= thresh_event_valid_q;
+
+            // Bin-length-load outputs.
+            bin_length_us_pipe_q      <= bin_length_us_q;
+            bin_length_valid_pipe_q   <= bin_length_valid_q;
+
+            // Request pulses.
+            debug_req_pipe_q          <= debug_req_q;
+            reload_req_pipe_q         <= reload_req_q;
+            boot_req_pipe_q           <= boot_req_q;
+
+            // Debug/page outputs.
+            debug_page_sel_pipe_q     <= debug_page_sel_q;
+
+            // CHANGED:
+            // Debug buses now reflect the internally decoded values, delayed
+            // by the same output pipeline stage as the other decoder outputs.
+            decoder_dbg_pipe_q        <= {
+                event_ready_i,
+                data_valid,
+                y_out_q,
+                x_out_q,
+                event_valid_q,
+                data_ready_c
+            };
+
+            decoder_output_dbg_pipe_q <= ts_out_q[31:0];
+        end
+    end
+
+    // ------------------------------------------------------------------
+    // Output assignments: output pipeline regs -> module outputs.
+    //
+    // CHANGED:
+    // These used to assign directly from *_q. They now assign from the
+    // added *_pipe_q registers.
+    // ------------------------------------------------------------------
+    assign x_out              = x_out_pipe_q;
+    assign y_out              = y_out_pipe_q;
+    assign ts_out             = ts_out_pipe_q;
+    assign event_valid        = event_valid_pipe_q;
+
+    assign evt_reads_done     = evt_reads_done_pipe_q;
+
+    assign weight_addr_o      = weight_addr_pipe_q;
+    assign weight_data_o      = weight_data_pipe_q;
+    assign weight_sram_addr_o = weight_sram_addr_pipe_q;
+    assign weight_event_valid = weight_event_valid_pipe_q;
+
+    assign thresh_data_o      = thresh_data_pipe_q;
+    assign thresh_addr_o      = thresh_addr_pipe_q;
+    assign thresh_event_valid = thresh_event_valid_pipe_q;
+
+    assign bin_length_us      = bin_length_us_pipe_q;
+    assign bin_length_valid   = bin_length_valid_pipe_q;
+
+    assign debug_req_o        = debug_req_pipe_q;
+    assign reload_req_o       = reload_req_pipe_q;
+    assign boot_req_o         = boot_req_pipe_q;
+
+    assign debug_page_sel     = debug_page_sel_pipe_q;
+    assign decoder_dbg        = decoder_dbg_pipe_q;
+    assign decoder_output_dbg = decoder_output_dbg_pipe_q;
 
 endmodule
