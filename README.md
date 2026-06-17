@@ -1,3 +1,4 @@
+
 # μTheia
 
 μTheia is a GF180MCU event-based machine-vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16×16 spatial grid, bins activity into 16 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports detections for four programmable classes through SPI or selectable physical debug/output pins.
@@ -15,7 +16,7 @@
 - **Output / debug:** Classification results are available over SPI and through selectable debug/output pins.
 - **Frequency:** 64 MHz on-chip and 32 MHz SPI
 
-### Project status: Ready for manufacture once migration to new wafer.space template is complete.
+### Project status: Migration to updated template complete. Timing closed in new slow corners. PASS system level tests but module level tests must be updated to account for new register stages introduced to meet timing in slow corner.
 
 ## Documentation
 
@@ -32,10 +33,10 @@ The [`docs/debug_mux_pinout.txt`](docs/debug_mux_pinout.txt) file documents per-
 
 ## Timing closure status @ 64 MHz
 
-<img width="1158" height="224" alt="timing_summary_chart" src="https://github.com/user-attachments/assets/c0aba63b-7c5d-4738-8593-235abb87570f" />
+<img width="1156" height="279" alt="Screenshot 2026-06-17 at 12 36 47 PM" src="https://github.com/user-attachments/assets/cc3213d4-0645-4b0b-9f2b-7c367f62b599" />
 
 ### Positive setup and hold slack in all tested corners.
-Note: Max capacitance violations are mostly pads being checked against the 0.2 pF global limit. The remaining max capacitance violations are all buffers within the clock net, again being checked against the aggressive 0.2 pF global limit. In both cases, all maximum capacitance violations were manually investigated, and the offending cells were checked to be within the maximum capacitances listed in their Liberty files.
+Note: Max capacitance violations are mostly pads being checked against the 0.2 pF global limit. The remaining max capacitance violations are all buffers within the clock net, again being checked against the aggressive 0.2 pF global limit. In both cases, all maximum capacitance violations were manually investigated, and the offending cells were checked to be within the maximum capacitances listed in their Liberty files. The maximum slew violations in the slowest corner are all bidirectional (assigned output) pads whose violations were similarly checked against their Liberty file entry and determined to be well within their characterized range.
 
 ### Full pass LVS and DRC
 
