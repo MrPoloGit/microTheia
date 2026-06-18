@@ -17,6 +17,15 @@ COUNTER_BITS  = CFG.get("COUNTER_BITS",  16)
 WEIGHT_BITS   = CFG.get("WEIGHT_BITS",   8)
 NUM_CLASSES   = CFG.get("NUM_CLASSES",   4)
 
+# RAM read latency the DUT is parameterized with. The synchronous feature/weight
+# read path is no longer a single cycle: the sram_wrapper runs with PIPELINE_READ
+# (2 cycles) and voxel_bin_core adds two more register stages on feature_data and
+# weight_data_flat, for a total of 4. The standalone DUT defaults READ_LATENCY=4,
+# so the RAM model below must return data exactly this many cycles after rd_en and
+# the published-score latency shifts with it. Kept in sync with the RTL default
+# (overridable via config -> -P like every other parameter).
+READ_LATENCY  = CFG.get("READ_LATENCY", 4)
+
 COUNTER_MASK = (1 << COUNTER_BITS) - 1
 WEIGHT_MASK  = (1 << WEIGHT_BITS)  - 1
 # Weights are SIGNED two's-complement int8: range [-128, 127].
@@ -26,7 +35,7 @@ WEIGHT_MAX   =  (1 << (WEIGHT_BITS - 1)) - 1
 SCORE_BITS = None
 SCORE_MASK = None
 
-EXPECTED_LATENCY = FEATURE_COUNT + 2
+EXPECTED_LATENCY = FEATURE_COUNT + 1 + READ_LATENCY
 
 
 def to_signed(val, bits):
@@ -41,7 +50,7 @@ def configure_from_dut(dut):
     global SCORE_BITS, SCORE_MASK, EXPECTED_LATENCY
     SCORE_BITS = len(dut.scores_flat) // NUM_CLASSES
     SCORE_MASK = (1 << SCORE_BITS) - 1
-    EXPECTED_LATENCY = FEATURE_COUNT + 2
+    EXPECTED_LATENCY = FEATURE_COUNT + 1 + READ_LATENCY
     dut._log.info(
         f"FEATURE_COUNT={FEATURE_COUNT} COUNTER_BITS={COUNTER_BITS} "
         f"WEIGHT_BITS={WEIGHT_BITS} NUM_CLASSES={NUM_CLASSES} SCORE_BITS={SCORE_BITS}"
@@ -71,12 +80,14 @@ def pack_weight_slice(w_at_addr):
 
 
 class RamModel:
-    """Models caller-side feature and weight RAMs with 1-cycle synchronous read latency."""
+    """Models caller-side feature and weight RAMs with `latency`-cycle synchronous
+    read latency, matching the DUT's READ_LATENCY parameter."""
 
-    def __init__(self, dut, features, weights):
+    def __init__(self, dut, features, weights, latency=None):
         self.dut      = dut
         self.features = features
         self.weights  = weights
+        self.latency  = READ_LATENCY if latency is None else latency
         self._task    = None
 
     def start(self):
@@ -91,20 +102,20 @@ class RamModel:
         self.dut.feature_data.value     = 0
         self.dut.weight_data_flat.value = 0
 
-        # Pipeline register: data captured this cycle is driven NEXT cycle.
-        # This matches sram_wrapper behaviour — rd_valid_i/rd_addr_i are
-        # registered at posedge, data appears one cycle later.  ReadOnly()
-        # sees post-NBA state (rd_en goes high in the *same* timestep as
-        # the start pulse), so without this pipeline the model is 1 cycle
-        # too fast vs real synchronous SRAM.
-        pipe_feat  = 0
-        pipe_wflat = 0
+        # Pipeline of (feature, weight) samples `latency` deep: data captured this
+        # cycle is driven `latency` cycles later.  This matches the real read path
+        # — the sram_wrapper (PIPELINE_READ) plus the extra register stages in
+        # voxel_bin_core register rd_valid_i/rd_addr_i and only present the data
+        # READ_LATENCY cycles later.  ReadOnly() sees post-NBA state (rd_en goes
+        # high in the *same* timestep as the start pulse), so without this pipeline
+        # the model is too fast vs the real synchronous SRAM path.
+        pipe = [(0, 0)] * self.latency
 
         while True:
             await RisingEdge(self.dut.clk)
             await ReadOnly()
 
-            # Sample this cycle's read request (delivered next cycle).
+            # Sample this cycle's read request (delivered `latency` cycles later).
             if int(self.dut.rd_en.value):
                 addr = int(self.dut.rd_addr.value)
                 new_feat = int(self.features[addr])
@@ -115,13 +126,13 @@ class RamModel:
                 new_feat  = 0
                 new_wflat = 0
 
-            # Drive data captured in the PREVIOUS cycle.
+            # Drive the oldest captured sample; shift the newest request in.
+            out_feat, out_wflat = pipe[0]
             await NextTimeStep()
-            self.dut.feature_data.value     = pipe_feat
-            self.dut.weight_data_flat.value = pipe_wflat
+            self.dut.feature_data.value     = out_feat
+            self.dut.weight_data_flat.value = out_wflat
 
-            pipe_feat  = new_feat
-            pipe_wflat = new_wflat
+            pipe = pipe[1:] + [(new_feat, new_wflat)]
 
 
 async def setup(dut):

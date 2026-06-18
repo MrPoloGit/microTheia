@@ -17,8 +17,14 @@ SCORE_BITS  = CFG["SCORE_BITS"]
 
 SCORE_MASK = (1 << SCORE_BITS) - 1
 
-# scores_valid → outputs latency: 4 cycles (capture → pair-reduce → merge → hold → compare)
-CLASSIFY_PIPE_CYCLES = 4
+# scores_valid -> outputs latency. The classifier pipeline is 7 registers deep:
+#   scores_valid_r -> pair_valid_r -> cand_valid_r -> rank_valid_r ->
+#   decision_valid_r -> decision_valid_r2 -> class_valid
+# (the cand and rank stages were split out to close timing). So class_valid is
+# asserted 7 clock edges after scores_valid is sampled. drive_and_check waits one
+# edge to sample the word and then CLASSIFY_PIPE_CYCLES more before checking, so
+# this must be latency-1 = 6.
+CLASSIFY_PIPE_CYCLES = 6
 
 # Must match weights/thresholds.mem (all zeros by default).
 CLASS_THRESHOLDS = [0, 0, 0, 0]
