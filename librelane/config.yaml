@@ -87,7 +87,7 @@ PL_RESIZER_HOLD_SLACK_MARGIN: 0.30
 GRT_RESIZER_HOLD_SLACK_MARGIN: 0.25
 
 # Increase for more logic on your die
-PL_TARGET_DENSITY_PCT: 40 # 35 best so far for ver 2.0
+PL_TARGET_DENSITY_PCT: 32 # 35 best so far for ver 2.0
 GRT_ALLOW_CONGESTION: true
 
 # NEW FROM TEMPLATE ---------------------------------------------

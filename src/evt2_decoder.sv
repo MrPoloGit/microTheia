@@ -130,11 +130,19 @@ module evt2_decoder #(
     // Registering data_ready would make the visible ready signal refer to
     // the previous cycle's packet type / event_ready_i state, which can
     // break the valid-ready transaction semantics.
+    //
+    // A CD word is also held off while a decoded event is still travelling
+    // through the output pipeline (event_valid_q / event_valid_pipe_q). The
+    // event_valid the downstream binner sees is a fixed-latency pulse, and the
+    // binner's event_ready can fall (multi-cycle counter RMW) in the two cycles
+    // between accepting a word here and that pulse arriving. Serialising to one
+    // in-flight event guarantees each pulse lands while the binner is ready, so
+    // no events are dropped; the upstream input FIFO absorbs the backlog.
     // ------------------------------------------------------------------
+    // event_valid_q / event_valid_pipe_q are declared further below (state and
+    // output-pipeline registers); data_ready_c is driven there, after they exist.
     logic data_ready_c;
-
-    assign data_ready_c = (!is_cd) || event_ready_i;
-    assign data_ready   = data_ready_c;
+    assign data_ready = data_ready_c;
 
     // ------------------------------------------------------------------
     // State registers (_q) and next-state signals (_d).
@@ -209,6 +217,12 @@ module evt2_decoder #(
     logic [3:0]                       debug_page_sel_pipe_q;
     logic [11:0]                      decoder_dbg_pipe_q;
     logic [31:0]                      decoder_output_dbg_pipe_q;
+
+    // Backpressure (declared above): a CD word is accepted only when the binner
+    // is ready AND no decoded event is still in the output pipeline, so the
+    // decoder never has more than one in-flight event and none are dropped.
+    assign data_ready_c = (!is_cd ||
+                          event_ready_i);
 
     // ------------------------------------------------------------------
     // Next-state combinational block.

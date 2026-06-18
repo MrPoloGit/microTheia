@@ -160,8 +160,15 @@ async def inject_event(dut, model, x, y, pol=1, ts=None):
     assert not readouts, "inject_event unexpectedly crossed a timestamp bin boundary"
     await RisingEdge(dut.clk)
     dut.event_valid.value = 0
-    # Wait for the 2-cycle RMW writeback to complete (event_ready may be 0 during rmw_pending).
-    await RisingEdge(dut.clk)
+    # Wait for the pipelined RMW (COUNTER_READ_LATENCY-deep read + writeback stage)
+    # to drain so event_ready returns high before the next event is driven. The
+    # latency is no longer a fixed 2 cycles, so poll event_ready instead.
+    while True:
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.event_ready.value) == 1:
+            break
+    await NextTimeStep()
 
 
 async def force_timer_rollover(dut):
@@ -273,6 +280,7 @@ async def timestamp_event_and_check(dut, model, x, y, ts, tag):
 @logged_test()
 async def test_reset_and_event_ready(dut):
     await setup(dut)
+    await ReadOnly()
     assert int(dut.event_ready.value) == 1
     assert int(dut.readout_valid.value) == 0
 
@@ -561,17 +569,31 @@ async def test_event_ready_low_during_rmw_pending(dut):
     dut.event_y.value = 1
     dut.ts_in.value = 0
     dut.event_valid.value = 1
-    await RisingEdge(dut.clk)   # cycle N: rmw_pending becomes 1
+    await RisingEdge(dut.clk)   # cycle N: RMW read issued, event_ready drops
     dut.event_valid.value = 0
 
     await ReadOnly()
     assert int(dut.event_ready.value) == 0, \
         "event_ready must be 0 during rmw_pending writeback cycle"
 
-    await RisingEdge(dut.clk)   # cycle N+1: rmw_pending clears
-    await ReadOnly()
-    assert int(dut.event_ready.value) == 1, \
-        "event_ready must return to 1 after RMW writeback completes"
+    # event_ready stays low for the full pipelined RMW transaction: the
+    # COUNTER_READ_LATENCY-deep (=4) counter-SRAM read pipeline plus the
+    # registered writeback staging, which measures 6 cycles total. (It was 2
+    # before the counter read path was pipelined for timing closure.)
+    EXPECTED_RMW_LOW_CYCLES = 6
+    low_cycles = 1
+    for _ in range(EXPECTED_RMW_LOW_CYCLES + 10):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if int(dut.event_ready.value) == 1:
+            break
+        low_cycles += 1
+    else:
+        assert False, "event_ready never returned to 1 after RMW"
+    assert low_cycles == EXPECTED_RMW_LOW_CYCLES, (
+        f"event_ready low for {low_cycles} cycles, expected {EXPECTED_RMW_LOW_CYCLES} "
+        f"(COUNTER_READ_LATENCY + writeback staging)"
+    )
 
 
 @logged_test()
