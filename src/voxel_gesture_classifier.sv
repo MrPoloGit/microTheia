@@ -270,19 +270,23 @@ module voxel_gesture_classifier #(
     // ------------------------------------------------------------------
     // Threshold SRAM read scheduling.
     //
-    // this still works with the extra candidate stage because rank_valid_r
-    // only goes high when max_class_rank_r is valid. the whole threshold read
-    // sequence is just one classifier cycle later now.
-    //
-    // Read sequence:
-    //   rank_valid_r      -> read class threshold at {1'b0, max_class}
-    //   decision_valid_r  -> read diff threshold  at {1'b1, max_class}
+    // The threshold SRAM read path is 2 cycles, not 1: the SRAM itself is one
+    // cycle and voxel_bin_core registers thresh_data once more for timing. The
+    // class threshold is captured when decision_valid_r is high and the diff
+    // threshold is consumed when decision_valid_r2 is high, so each read must be
+    // ISSUED two cycles earlier than it is used. We therefore issue them one
+    // stage earlier than the consuming stage (max_class is identical across the
+    // cand/rank/decision stages, so the address is the same winning class):
+    //   cand_valid_r -> read class threshold at {1'b0, max_class}  (used @ decision_valid_r)
+    //   rank_valid_r -> read diff  threshold at {1'b1, max_class}  (used @ decision_valid_r2)
+    // (Was rank/decision, which assumed a 1-cycle SRAM and latched a stale
+    // threshold once the extra bin_core register stage was added.)
     // ------------------------------------------------------------------
-    assign thresh_rd_valid = rank_valid_r | decision_valid_r;
+    assign thresh_rd_valid = cand_valid_r | rank_valid_r;
 
-    assign thresh_rd_addr  = rank_valid_r
-                             ? {1'b0, max_class_rank_r[ADDR_BITS-1:0]}
-                             : {1'b1, max_class_r[ADDR_BITS-1:0]};
+    assign thresh_rd_addr  = cand_valid_r
+                             ? {1'b0, max_class_cand_r[ADDR_BITS-1:0]}
+                             : {1'b1, max_class_rank_r[ADDR_BITS-1:0]};
 
     // ------------------------------------------------------------------
     // Stage 3: Capture class threshold and delay decision fields.

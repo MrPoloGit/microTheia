@@ -24,6 +24,14 @@ MAP_FLIP_Y = CFG.get("MAP_FLIP_Y", 0)
 
 REQUIRE_TIME_HIGH = 1
 
+# Total latency (in clock edges) from a word being sampled to its decoded result
+# appearing on the registered output ports. The decoder registers its decoded
+# state once (x_out_q/event_valid_q ...) and then again through the added output
+# pipeline stage (x_out_pipe_q ...), so a word presented in cycle T shows up on
+# x_out/y_out/event_valid (and weight_*/thresh_*/req pulses) in cycle T+2.
+# data_ready is intentionally NOT pipelined (current-cycle backpressure).
+DECODER_OUTPUT_LATENCY = 2
+
 EVT_CD_OFF = 0x0
 EVT_CD_ON = 0x1
 EVT_TIME_HIGH = 0x8
@@ -120,6 +128,14 @@ async def setup(dut):
 
 
 async def drive_and_check(dut, model, rst, data_in, data_valid, event_ready_i, tag):
+    # The decoder now holds off a new CD word while a decoded event is still in
+    # its output pipeline (it back-pressures so the upstream FIFO buffers the
+    # backlog). Drain any in-flight event out of the pipe first, with data_valid
+    # low, so this word is presented to an empty pipeline and accepted at once.
+    dut.data_valid.value = 0
+    for _ in range(DECODER_OUTPUT_LATENCY - 1):
+        await RisingEdge(dut.clk)
+
     dut.rst.value = rst
     dut.data_in.value = data_in
     dut.data_valid.value = data_valid
@@ -127,12 +143,26 @@ async def drive_and_check(dut, model, rst, data_in, data_valid, event_ready_i, t
 
     exp_data_ready = model.step(rst, data_in, data_valid, event_ready_i)
 
-    await RisingEdge(dut.clk)
+    # data_ready is current-cycle backpressure: with the pipe drained it is just
+    # (!is_cd) || event_ready_i. Check it on the presentation cycle, before the
+    # sampling edge (after the word is sampled the pipe is no longer empty).
     await ReadOnly()
-
     assert int(dut.data_ready.value) == exp_data_ready, (
         f"{tag}: data_ready DUT={int(dut.data_ready.value)} model={exp_data_ready}"
     )
+    await NextTimeStep()
+
+    # Sample the word, deassert data_valid so it is consumed exactly once, and
+    # drain the output pipeline so the decoded result reaches the ports. The
+    # outputs then stay valid until the next call drives a new word, so a caller
+    # can read x_out/event_valid/etc. immediately after this returns.
+    await RisingEdge(dut.clk)
+    await NextTimeStep()
+    dut.data_valid.value = 0
+    for _ in range(DECODER_OUTPUT_LATENCY - 1):
+        await RisingEdge(dut.clk)
+    await ReadOnly()
+
     assert int(dut.x_out.value) == model.x_out, (
         f"{tag}: x_out DUT={int(dut.x_out.value)} model={model.x_out}"
     )
@@ -435,11 +465,21 @@ async def reset_dut(dut):
 
 
 async def send_word(dut, word):
+    # Drain any event left in the output pipe by a previous word so a CD word is
+    # not back-pressured (the decoder holds off CD words while an event is in the
+    # pipeline). Harmless for non-CD words.
+    dut.data_valid.value = 0
+    for _ in range(DECODER_OUTPUT_LATENCY - 1):
+        await RisingEdge(dut.clk)
     dut.data_in.value = word
     dut.data_valid.value = 1
-    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)        # sample the word
     dut.data_valid.value = 0
-    await RisingEdge(dut.clk)
+    # Drain the decoder's registered output pipeline so the decoded payload /
+    # one-cycle pulse (weight_*, thresh_*, evt_reads_done, *_req, debug_page_sel)
+    # has propagated to the output ports before the caller reads them.
+    for _ in range(DECODER_OUTPUT_LATENCY):
+        await RisingEdge(dut.clk)
 
 
 @logged_test()
