@@ -221,8 +221,8 @@ module evt2_decoder #(
     // Backpressure (declared above): a CD word is accepted only when the binner
     // is ready AND no decoded event is still in the output pipeline, so the
     // decoder never has more than one in-flight event and none are dropped.
-    assign data_ready_c = (!is_cd) ||
-                          (event_ready_i && !event_valid_q && !event_valid_pipe_q);
+    assign data_ready_c = (!is_cd ||
+                          event_ready_i);
 
     // ------------------------------------------------------------------
     // Next-state combinational block.
