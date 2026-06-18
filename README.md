@@ -1,4 +1,3 @@
-
 # μTheia
 
 μTheia is a GF180MCU event-based machine-vision ASIC for motion-pattern classification from EVT2 event streams. The chip receives EVT2 event data and configuration commands over SPI, decodes timestamped events, compresses 320×320 sensor coordinates into a 16×16 spatial grid, bins activity into 16 programmable-duration temporal bins, stores feature windows in SRAM, performs integer MAC scoring against programmable class weights, and reports detections for four programmable classes through SPI or selectable physical debug/output pins.
@@ -33,9 +32,10 @@ The [`docs/debug_mux_pinout.txt`](docs/debug_mux_pinout.txt) file documents per-
 
 ## Timing closure status @ 64 MHz
 
-<img width="1156" height="279" alt="Screenshot 2026-06-17 at 12 36 47 PM" src="https://github.com/user-attachments/assets/cc3213d4-0645-4b0b-9f2b-7c367f62b599" />
+<img width="1156" height="277" alt="Screenshot 2026-06-18 at 4 44 27 PM" src="https://github.com/user-attachments/assets/2b3a0a7b-6eb6-45b2-b011-485fa4a000b1" />
 
 ### Positive setup and hold slack in all tested corners.
+
 Note: Max capacitance violations are mostly pads being checked against the 0.2 pF global limit. The remaining max capacitance violations are all buffers within the clock net, again being checked against the aggressive 0.2 pF global limit. In both cases, all maximum capacitance violations were manually investigated, and the offending cells were checked to be within the maximum capacitances listed in their Liberty files. The maximum slew violations in the slowest corner are all bidirectional (assigned output) pads whose violations were similarly checked against their Liberty file entry and determined to be well within their characterized range.
 
 ### Full pass LVS and DRC
