@@ -15,7 +15,7 @@
 - **Output / debug:** Classification results are available over SPI and through selectable debug/output pins.
 - **Frequency:** 64 MHz on-chip and 32 MHz SPI
 
-### Project status: Migration to updated template complete. Timing closed in new slow corners. PASS system level tests but module level tests must be updated to account for new register stages introduced to meet timing in slow corner.
+### Project status: Ready for manufacture pending template update.
 
 ## Documentation
 
