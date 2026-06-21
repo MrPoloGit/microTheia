@@ -43,7 +43,7 @@ module control_fsm #(
     assign main_state_dbg_o = main_state;
     assign load_state_dbg_o = load_state;
 
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk) begin
         if (!rst_n) begin
             main_state        <= ST_BOOT;
             load_state        <= LD_IDLE;

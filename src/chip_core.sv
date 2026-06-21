@@ -104,7 +104,7 @@ module chip_core #(
     logic input_in_8_sync_0;
     logic input_in_8_sync_1;
     logic input_in_8_prev;
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk) begin
         if (!rst_n) begin
             input_in_8_sync_0 <= 1'b0;
             input_in_8_sync_1 <= 1'b0;
@@ -119,7 +119,7 @@ module chip_core #(
     assign alt_mode_trigger = input_in_8_sync_1 & ~input_in_8_prev;
 
     //alt_select flips on rising edge from ALT_INPUT_MODE pin
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk) begin
         if(!rst_n) begin
             alt_select <= 1'b0;
         end
@@ -140,7 +140,7 @@ module chip_core #(
 
     //heartbeat signal, approx 1 sec on and 1 sec off
     logic [24:0] counter;
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk) begin
         if (!rst_n)
             counter <= '0;
         else

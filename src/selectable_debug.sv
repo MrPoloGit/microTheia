@@ -238,7 +238,7 @@ always_comb begin
 end
 
 //adding flops to break long combinational paths
-always_ff @(posedge clk or posedge rst) begin
+always_ff @(posedge clk) begin
     if (rst) begin
         debug_bus <= 32'b0;
     end else begin
