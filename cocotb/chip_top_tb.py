@@ -83,8 +83,10 @@ CHIP_PERIOD_PS = _raw_ps + (_raw_ps % 2)   # cocotb Clock requires an even ps pe
 DATA_WIDTH     = 32
 
 # Each SCLK half-period expressed in chip-clock cycles.
-# 1 cycle → 32 MHz SCLK at 64 MHz chip clock.
-SPI_HALF = int(os.getenv("SPI_HALF_CYCLES", "1"))
+# 1 cycle -> 32 MHz SCLK at 64 MHz chip clock.  Timed STA GLS includes pad,
+# interconnect, and clock-tree delay, so keep the default SPI stimulus away
+# from the absolute 2x sampling limit unless the caller explicitly overrides it.
+SPI_HALF = int(os.getenv("SPI_HALF_CYCLES", "2" if timing else "1"))
 
 # ── Pin map ───────────────────────────────────────────────────────────────────
 # input_PAD indices
@@ -1546,10 +1548,16 @@ def chip_top_runner():
 
         pdk_libs = Path(pdk_root) / pdk / "libs.ref"
 
-        # SCL cell models: prefer ciel-managed PDK path; fall back to the
-        # vendored sim/ stub (kept for Verilator compat / offline use).
+        # SCL cell models: prefer the ciel-managed PDK path for functional GLS,
+        # but use the local model for timed STA GLS. The upstream GF180 model at
+        # the pinned PDK revision has no specify blocks, so Icarus cannot bind
+        # SDF IOPATH delays against it.
         pdk_scl_v = pdk_libs / scl / "verilog" / f"{scl}.v"
-        scl_v = pdk_scl_v if pdk_scl_v.exists() else proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3.v"
+        local_scl_v = proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3.v"
+        if timing and scl == "gf180mcu_as_sc_mcu7t3v3":
+            scl_v = local_scl_v
+        else:
+            scl_v = pdk_scl_v if pdk_scl_v.exists() else local_scl_v
         scl_prim = pdk_libs / scl / "verilog" / "primitives.v"
 
         # IO pad models: prefer ciel-managed PDK path; fall back to vendored stubs.
@@ -1562,10 +1570,9 @@ def chip_top_runner():
         # gf180mcu_as_sc_mcu7t3v3 has no separate primitives.v; all others do.
         if scl != "gf180mcu_as_sc_mcu7t3v3" and scl_prim.exists():
             sources.append(scl_prim)
-        # Extra stubs for cells used by the netlist but missing from the PDK
-        # Verilog model (e.g. dfxtp_4). Only include when using the real PDK
-        # file — when falling back to the sim/ stub the stub already covers them.
-        if scl == "gf180mcu_as_sc_mcu7t3v3" and pdk_scl_v.exists():
+        # Extra stub for dfxtp_4, which is used by the netlist but absent from
+        # both the upstream and local gf180mcu_as_sc_mcu7t3v3 models.
+        if scl == "gf180mcu_as_sc_mcu7t3v3":
             sources.append(proj_path / "../sim/gf180mcu_as_sc_mcu7t3v3_missing_cells.v")
         sources += [
             # IO pad models.

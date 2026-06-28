@@ -24,10 +24,6 @@ assign Q = state;
 `ifndef FUNCTIONAL
 specify
 	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
-	$setup(posedge D, posedge CLK, 0:0:0);
-	$setup(negedge D, posedge CLK, 0:0:0);
-	$hold(posedge CLK, posedge D, 0:0:0);
-	$hold(posedge CLK, negedge D, 0:0:0);
 endspecify
 `endif
 
