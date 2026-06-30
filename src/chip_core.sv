@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: © 2025 XXX Authors
 // SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 
 `default_nettype none
 
@@ -12,10 +12,10 @@ module chip_core #(
     inout  wire VDD,
     inout  wire VSS,
     `endif
-    
+
     input  wire clk,       // clock
     input  wire rst_n,     // reset (active low)
-    
+
     input  wire [NUM_INPUT_PADS-1:0] input_in,   // Input value
     output wire [NUM_INPUT_PADS-1:0] input_pu,   // Pull-up
     output wire [NUM_INPUT_PADS-1:0] input_pd,   // Pull-down

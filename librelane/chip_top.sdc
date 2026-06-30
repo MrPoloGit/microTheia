@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
+
 current_design $::env(DESIGN_NAME)
 set_units -time ns
 
@@ -42,19 +45,19 @@ if { [info exists ::env(MAX_CAPACITANCE_CONSTRAINT)] } {
 set clocks [get_clocks $clock_port]
 
 # Bidirectional pads
-set clk_core_inout_ports [get_ports { 
+set clk_core_inout_ports [get_ports {
     bidir_PAD[*]
-}] 
+}]
 
 set_input_delay -min 0 -clock $clocks $clk_core_inout_ports
 set_input_delay -max $input_delay_value -clock $clocks $clk_core_inout_ports
 set_output_delay $output_delay_value -clock $clocks $clk_core_inout_ports
 
 # Input-only pads
-set clk_core_input_ports [get_ports { 
+set clk_core_input_ports [get_ports {
     rst_n_PAD
     input_PAD[*]
-}] 
+}]
 
 set_input_delay -min 0 -clock $clocks $clk_core_input_ports
 set_input_delay -max $input_delay_value -clock $clocks $clk_core_input_ports

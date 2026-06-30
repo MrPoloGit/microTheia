@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Group G Contributors
+
 `timescale 1ns/1ps
 
 // EVT2 word fields: [31:28] type, [27:22] ts_lsb, [21:11] x, [10:0] y

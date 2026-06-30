@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 //
 // Simulator-friendly replacements for the gf180mcu_ws_io power pad cells.
 // Upstream models in the PDK are pure supply pads — no signal behavior —

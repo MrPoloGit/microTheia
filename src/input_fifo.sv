@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Group G Contributors
+
 `timescale 1ns/1ps
 
 module input_fifo #(
     parameter int FIFO_DEPTH = 256,
     parameter int DATA_WIDTH = 32
-)(  
+)(
 `ifdef USE_POWER_PINS
     inout  wire                   VDD,
     inout  wire                   VSS,
