@@ -15,7 +15,12 @@ emits:
      "Chosen value not defined" before it even reaches the cell entries.
      We fix this by promoting `max::min` to `max:min:min`.
 
-  2. INTERCONNECT entries that reference IO pad/SRAM instances with escaped
+  2. TIMINGCHECK sections are parsed but not implemented by Icarus 13, which
+     floods the log with one warning per SETUP/HOLD/WIDTH entry. These checks
+     are not enforced by vvp, so dropping the blocks is equivalent to keeping
+     them for simulation behavior.
+
+  3. INTERCONNECT entries that reference IO pad/SRAM instances with escaped
      names (e.g. `analog\\[1\\]\\.pad.ASIG5V`) crash vvp:
         SDF ERROR: ...: Submodule analog[1] in port path not found!
         SDF ERROR: ...: Submodule pad in port path not found!
@@ -27,7 +32,7 @@ emits:
      clk/rst port-to-pad INTERCONNECT entries (`clk_PAD clk_pad.PAD`,
      `rst_n_PAD rst_n_pad.PAD`), even though the pad instances exist.
 
-  3. CELL blocks for flattened instance names containing escaped dots or
+  4. CELL blocks for flattened instance names containing escaped dots or
      brackets (e.g. `bidir\\[0\\]\\.pad` or `i_chip_core\\.u_soc...`) hit
      the same parser limitation:
         SDF ERROR: ...: Cannot find bidir[0] in scope ...
@@ -36,9 +41,9 @@ emits:
      the Verilog escaped identifier. There is no alternate SDF spelling that
      resolves these names, so we drop only those CELL blocks.
 
-Flat std-cell annotations (IOPATHs, TIMINGCHECKs, and conditional delays
-whose instances are named `_12345_` or similar) are left untouched. Those are
-the bulk of the gate timing data and Icarus can annotate them once the wrapper
+Flat std-cell delay annotations (IOPATHs and conditional delays whose
+instances are named `_12345_` or similar) are left untouched. Those are the
+bulk of the gate timing data and Icarus can annotate them once the wrapper
 specify blocks are enabled.
 
 Usage:
@@ -171,11 +176,47 @@ def _drop_unannotatable_cell_blocks(text: str) -> tuple[str, int]:
     return ''.join(out_lines), cells_dropped
 
 
-def fix(src: Path, dst: Path) -> tuple[int, int, int]:
-    """Return (triplets_fixed, interconnects_dropped, cells_dropped)."""
+def _drop_timingcheck_blocks(text: str) -> tuple[str, int]:
+    out_lines: list[str] = []
+    block_lines: list[str] = []
+    block_depth = 0
+    blocks_dropped = 0
+
+    for line in text.splitlines(keepends=True):
+        if not block_lines and line.lstrip().startswith('(TIMINGCHECK'):
+            block_lines = [line]
+            block_depth = _paren_delta(line)
+            if block_depth <= 0:
+                blocks_dropped += 1
+                block_lines = []
+                block_depth = 0
+            continue
+
+        if block_lines:
+            block_lines.append(line)
+            block_depth += _paren_delta(line)
+            if block_depth <= 0:
+                blocks_dropped += 1
+                block_lines = []
+                block_depth = 0
+            continue
+
+        out_lines.append(line)
+
+    if block_lines:
+        # Preserve malformed/truncated input for downstream diagnostics rather
+        # than silently deleting the tail of the file.
+        out_lines.extend(block_lines)
+
+    return ''.join(out_lines), blocks_dropped
+
+
+def fix(src: Path, dst: Path) -> tuple[int, int, int, int]:
+    """Return (triplets_fixed, interconnects_dropped, cells_dropped, timingchecks_dropped)."""
     text = src.read_text()
 
     new_text, triplets_fixed = _TRIPLET_RE.subn(_fix_triplet, text)
+    new_text, timingchecks_dropped = _drop_timingcheck_blocks(new_text)
 
     out_lines: list[str] = []
     interconnects_dropped = 0
@@ -188,7 +229,7 @@ def fix(src: Path, dst: Path) -> tuple[int, int, int]:
     new_text, cells_dropped = _drop_unannotatable_cell_blocks(''.join(out_lines))
 
     dst.write_text(new_text)
-    return triplets_fixed, interconnects_dropped, cells_dropped
+    return triplets_fixed, interconnects_dropped, cells_dropped, timingchecks_dropped
 
 
 def main(argv: list[str]) -> int:
@@ -204,9 +245,10 @@ def main(argv: list[str]) -> int:
         return 2
 
     dst.parent.mkdir(parents=True, exist_ok=True)
-    triplets, interconnects, cells = fix(src, dst)
+    triplets, interconnects, cells, timingchecks = fix(src, dst)
     print(
         f'[sdf_fix] {src.name}: fixed {triplets} triplets, '
+        f'dropped {timingchecks} unsupported TIMINGCHECK blocks, '
         f'dropped {interconnects} unannotatable INTERCONNECT entries, '
         f'dropped {cells} unannotatable CELL blocks  ->  {dst}'
     )

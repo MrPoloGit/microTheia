@@ -14,7 +14,7 @@ module gf180mcu_as_sc_mcu7t3v3__dfxtp_2(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input CLK,
 	input D,
 	output Q
@@ -28,10 +28,6 @@ assign Q = state;
 `ifndef FUNCTIONAL
 specify
 	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
-	$setup(posedge D, posedge CLK, 0:0:0);
-	$setup(negedge D, posedge CLK, 0:0:0);
-	$hold(posedge CLK, posedge D, 0:0:0);
-	$hold(posedge CLK, negedge D, 0:0:0);
 endspecify
 `endif
 
@@ -42,7 +38,7 @@ module gf180mcu_as_sc_mcu7t3v3__dfxtn_2(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input CLK,
 	input D,
 	output Q
@@ -56,10 +52,6 @@ assign Q = state;
 `ifndef FUNCTIONAL
 specify
 	(negedge CLK => (Q:D)) = (0:0:0, 0:0:0);
-	$setup(posedge D, negedge CLK, 0:0:0);
-	$setup(negedge D, negedge CLK, 0:0:0);
-	$hold(negedge CLK, posedge D, 0:0:0);
-	$hold(negedge CLK, negedge D, 0:0:0);
 endspecify
 `endif
 
@@ -94,10 +86,6 @@ assign Q = q_r;
 `ifndef FUNCTIONAL
 specify
 	(posedge CLK => (Q:D)) = (0:0:0, 0:0:0);
-	$setup(posedge D, posedge CLK, 0:0:0);
-	$setup(negedge D, posedge CLK, 0:0:0);
-	$hold(posedge CLK, posedge D, 0:0:0);
-	$hold(posedge CLK, negedge D, 0:0:0);
 endspecify
 `endif
 
@@ -108,7 +96,6 @@ module gf180mcu_as_sc_mcu7t3v3__buff_2(
 	input VNW,
 	input VDD,
 	input VSS,
-	
 	input A,
 	output Y
 );
@@ -130,7 +117,6 @@ module gf180mcu_as_sc_mcu7t3v3__buff_4(
 	input VNW,
 	input VDD,
 	input VSS,
-	
 	input A,
 	output Y
 );
@@ -175,6 +161,48 @@ module gf180mcu_as_sc_mcu7t3v3__buff_12(
 	input VDD,
 	input VSS,
 	
+	input A,
+	output Y
+);
+
+assign Y = A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+module gf180mcu_as_sc_mcu7t3v3__buff_16(
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
+	input A,
+	output Y
+);
+
+assign Y = A;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+module gf180mcu_as_sc_mcu7t3v3__dlybuff_2(
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
 	input A,
 	output Y
 );
@@ -785,6 +813,31 @@ endspecify
 
 endmodule
 
+module gf180mcu_as_sc_mcu7t3v3__xor2_2(
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
+
+	input A,
+	input B,
+	output Y
+);
+
+assign Y = A != B;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
 module gf180mcu_as_sc_mcu7t3v3__maj3_2(
 	input VPW,
 	input VNW,
@@ -1296,6 +1349,130 @@ module gf180mcu_as_sc_mcu7t3v3__ao31_4 (
 );
 
 assign Y = (A & B & C) | D;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+module gf180mcu_as_sc_mcu7t3v3__aoi211_2 (
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
+
+	input A,
+	input B,
+	input C,
+	input D,
+	output Y
+);
+
+assign Y = ~((A & B) | C | D);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+module gf180mcu_as_sc_mcu7t3v3__aoi211_4 (
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
+
+	input A,
+	input B,
+	input C,
+	input D,
+	output Y
+);
+
+assign Y = ~((A & B) | C | D);
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+module gf180mcu_as_sc_mcu7t3v3__ao211_2 (
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
+
+	input A,
+	input B,
+	input C,
+	input D,
+	output Y
+);
+
+assign Y = (A & B) | C | D;
+
+
+`ifndef FUNCTIONAL
+specify
+	(posedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(negedge A => (Y:A)) = (0:0:0, 0:0:0);
+	(posedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(negedge B => (Y:B)) = (0:0:0, 0:0:0);
+	(posedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(negedge C => (Y:C)) = (0:0:0, 0:0:0);
+	(posedge D => (Y:D)) = (0:0:0, 0:0:0);
+	(negedge D => (Y:D)) = (0:0:0, 0:0:0);
+endspecify
+`endif
+
+endmodule
+
+module gf180mcu_as_sc_mcu7t3v3__oai211_2 (
+	input VPW,
+	input VNW,
+	input VDD,
+	input VSS,
+
+	input A,
+	input B,
+	input C,
+	input D,
+	output Y
+);
+
+assign Y = ~((A | B) & C & D);
 
 
 `ifndef FUNCTIONAL
