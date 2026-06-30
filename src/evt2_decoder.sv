@@ -90,6 +90,20 @@ module evt2_decoder #(
     wire [10:0] y_raw    = evt_word[10:0];
     wire        is_cd    = (pkt_type == EVT_CD_OFF) || (pkt_type == EVT_CD_ON);
 
+    // Field extractions as wires — avoids constant-select warnings in always_* processes.
+    wire [27:0] pkt_time_high_bits   = evt_word[27:0];
+    wire [5:0]  pkt_ts_lsb           = evt_word[27:22];
+    wire [7:0]  pkt_weight_data      = evt_word[27:20];
+    wire [11:0] pkt_weight_addr      = evt_word[19:8];
+    wire [5:0]  pkt_weight_sram      = evt_word[7:2];
+    wire [18:0] pkt_thresh_upper     = evt_word[27:9];
+    wire [17:0] pkt_thresh_lower     = evt_word[27:10];
+    wire [2:0]  pkt_thresh_addr_bits = evt_word[9:7];
+    wire [16:0] pkt_bin_len          = evt_word[16:0];
+    wire [3:0]  pkt_idx4             = evt_word[27:24];
+    wire [10:0] pkt_xbound           = evt_word[23:13];
+    wire [10:0] pkt_ybound           = evt_word[12:2];
+
     // ------------------------------------------------------------------
     // Grid coordinate combinational logic.
     // ------------------------------------------------------------------
@@ -110,12 +124,12 @@ module evt2_decoder #(
 
         for (int i = 0; i < 15; i++) begin
             if (x_clamped <= xbound_q[i] && x_grid == 4'd15)
-                x_grid = i[3:0];
+                x_grid = GRID_BITS'(i);
         end
 
         for (int j = 0; j < 15; j++) begin
             if (y_clamped <= ybound_q[j] && y_grid == 4'd15)
-                y_grid = j[3:0];
+                y_grid = GRID_BITS'(j);
         end
     end
 
@@ -273,7 +287,7 @@ module evt2_decoder #(
             case (pkt_type)
                 EVT_TIME_HIGH: begin
                     have_time_high_d = 1'b1;
-                    time_high_reg_d  = evt_word[27:0];
+                    time_high_reg_d  = pkt_time_high_bits;
                 end
 
                 EVT_CD_OFF,
@@ -281,51 +295,51 @@ module evt2_decoder #(
                     if (!REQUIRE_TIME_HIGH || have_time_high_q) begin
                         x_out_d       = x_grid;
                         y_out_d       = y_grid;
-                        ts_out_d      = {time_high_reg_q, evt_word[27:22]};
+                        ts_out_d      = {time_high_reg_q, pkt_ts_lsb};
                         event_valid_d = 1'b1;
                     end
                 end
 
                 EVT_WEIGHT: begin
                     if (evt_ld_en) begin
-                        weight_data_d        = evt_word[27:20];
-                        weight_addr_d        = evt_word[19:8];
-                        weight_sram_addr_d   = evt_word[7:2];
+                        weight_data_d        = pkt_weight_data;
+                        weight_addr_d        = pkt_weight_addr;
+                        weight_sram_addr_d   = pkt_weight_sram;
                         weight_event_valid_d = 1'b1;
                     end
                 end
 
                 EVT_THRESH_U: begin
                     if (evt_ld_en) begin
-                        thresh_reg_d = evt_word[27:9];
+                        thresh_reg_d = pkt_thresh_upper;
                     end
                 end
 
                 EVT_THRESH_L: begin
                     if (evt_ld_en) begin
-                        thresh_data_d        = {thresh_reg_q, evt_word[27:10]};
-                        thresh_addr_d        = evt_word[9:7];
+                        thresh_data_d        = {thresh_reg_q, pkt_thresh_lower};
+                        thresh_addr_d        = pkt_thresh_addr_bits;
                         thresh_event_valid_d = 1'b1;
                     end
                 end
 
                 BIN_LENGTH_U: begin
                     if (evt_ld_en) begin
-                        bin_length_reg_d = evt_word[16:0];
+                        bin_length_reg_d = pkt_bin_len;
                     end
                 end
 
                 BIN_LENGTH_L: begin
                     if (evt_ld_en) begin
-                        bin_length_us_d    = {bin_length_reg_q, evt_word[16:0]};
+                        bin_length_us_d    = {bin_length_reg_q, pkt_bin_len};
                         bin_length_valid_d = 1'b1;
                     end
                 end
 
                 VOXEL_DIMS: begin
                     if (evt_ld_en) begin
-                        xbound_d[evt_word[27:24]] = evt_word[23:13];
-                        ybound_d[evt_word[27:24]] = evt_word[12:2];
+                        xbound_d[pkt_idx4] = pkt_xbound;
+                        ybound_d[pkt_idx4] = pkt_ybound;
                     end
                 end
 
@@ -346,7 +360,7 @@ module evt2_decoder #(
                 end
 
                 DEBUG_PAGE: begin
-                    debug_page_sel_d = evt_word[27:24];
+                    debug_page_sel_d = pkt_idx4;
                 end
 
                 default: begin
