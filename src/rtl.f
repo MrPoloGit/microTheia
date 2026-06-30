@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
 # sources
 src/chip_core.sv
 src/control_fsm.sv

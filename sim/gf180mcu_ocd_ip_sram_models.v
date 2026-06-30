@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 //
 // Behavioural simulation models for the GF180MCU OCD 3.3V SRAM macros.
 //

@@ -198,22 +198,22 @@ module sram_wrapper #(
     assign wr_data_pad = {{(BYTES*8 - width_p){1'b0}}, wr_data_i};
 
     // Macro tiles: NUM_BANKS banks × BYTES byte-lane macros.
-    genvar b, byte_i;
+    genvar b_GEN, byte_i_GEN;
     generate
-        for (b = 0; b < NUM_BANKS; b++) begin : gen_bank
+        for (b_GEN = 0; b_GEN < NUM_BANKS; b_GEN++) begin : gen_bank
             logic [MACRO_ABITS-1:0] addr_b;
-            assign addr_b = (wr_valid_i & (wr_bank == 2'(b)))
+            assign addr_b = (wr_valid_i & (wr_bank == 2'(b_GEN)))
                             ? wr_addr_low : rd_addr_low;
 
-            for (byte_i = 0; byte_i < BYTES; byte_i++) begin : gen_byte
+            for (byte_i_GEN = 0; byte_i_GEN < BYTES; byte_i_GEN++) begin : gen_byte
                 logic cen_w, gwen_w;
 
                 assign cen_w  = reset_i | ~(
-                                    (wr_valid_i & (wr_bank == 2'(b))) |
-                                    (rd_valid_i & (rd_bank == 2'(b)))
+                                    (wr_valid_i & (wr_bank == 2'(b_GEN))) |
+                                    (rd_valid_i & (rd_bank == 2'(b_GEN)))
                                 );
 
-                assign gwen_w = ~(wr_valid_i & (wr_bank == 2'(b)));
+                assign gwen_w = ~(wr_valid_i & (wr_bank == 2'(b_GEN)));
 
                 if (MACRO_DEPTH == 256) begin : sel
                     gf180mcu_ocd_ip_sram__sram256x8m8wm1 u_sram (
@@ -226,8 +226,8 @@ module sram_wrapper #(
                         .GWEN(gwen_w),
                         .WEN (8'h00),
                         .A   (addr_b[7:0]),
-                        .D   (wr_data_pad[byte_i*8 +: 8]),
-                        .Q   (q_all[b][byte_i])
+                        .D   (wr_data_pad[byte_i_GEN*8 +: 8]),
+                        .Q   (q_all[b_GEN][byte_i_GEN])
                     );
                 end else if (MACRO_DEPTH == 512) begin : sel
                     gf180mcu_ocd_ip_sram__sram512x8m8wm1 u_sram (
@@ -240,8 +240,8 @@ module sram_wrapper #(
                         .GWEN(gwen_w),
                         .WEN (8'h00),
                         .A   (addr_b[8:0]),
-                        .D   (wr_data_pad[byte_i*8 +: 8]),
-                        .Q   (q_all[b][byte_i])
+                        .D   (wr_data_pad[byte_i_GEN*8 +: 8]),
+                        .Q   (q_all[b_GEN][byte_i_GEN])
                     );
                 end else begin : sel
                     gf180mcu_ocd_ip_sram__sram1024x8m8wm1 u_sram (
@@ -254,8 +254,8 @@ module sram_wrapper #(
                         .GWEN(gwen_w),
                         .WEN (8'h00),
                         .A   (addr_b[9:0]),
-                        .D   (wr_data_pad[byte_i*8 +: 8]),
-                        .Q   (q_all[b][byte_i])
+                        .D   (wr_data_pad[byte_i_GEN*8 +: 8]),
+                        .Q   (q_all[b_GEN][byte_i_GEN])
                     );
                 end
             end

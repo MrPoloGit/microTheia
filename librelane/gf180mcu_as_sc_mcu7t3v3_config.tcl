@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
+
 set current_folder [file dirname [file normalize [info script]]]
 # Technology lib
 

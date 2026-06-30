@@ -660,7 +660,7 @@ def make_cd_word(x, y, ts_lsb=0, pkt=EVT_CD_OFF):
 async def test_custom_voxel_binning(dut):
 
     cocotb.start_soon(
-        Clock(dut.clk, 15.624, units="ns").start()
+        Clock(dut.clk, 15.624, unit="ns").start()
     )  # cocotb.start_soon(Clock(dut.clk, 15625, units="ps").start())
     await reset_dut(dut)
     expected_bounds = []

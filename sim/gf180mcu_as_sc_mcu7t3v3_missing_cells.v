@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 // Stubs for cells used by the synthesised netlist but absent from the
 // ciel-managed gf180mcu_as_sc_mcu7t3v3 PDK Verilog model at commit
 // f6bfbd4d3d23c4236ff1f36126489ee59aa35cbd.

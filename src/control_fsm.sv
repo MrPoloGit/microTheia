@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Group G Contributors
+`timescale 1ns/1ps
+
+`default_nettype none
+
 module control_fsm #(
     parameter int unsigned PWR_WAIT_CYCLES = 1024
 ) (
@@ -30,7 +34,7 @@ module control_fsm #(
         LD_IDLE      = 6'd0,
         LD_WAIT_PWR  = 6'd1,
         LD_OPEN      = 6'd2,
-        LD_WAIT      = 6'd3 , 
+        LD_WAIT      = 6'd3 ,
         LD_DONE      = 6'd4,
         LD_FAIL      = 6'd5
     } load_state_t;

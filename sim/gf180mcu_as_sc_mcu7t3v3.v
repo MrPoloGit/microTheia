@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 // Vendored copy of AvalonSemiconductors/gf180mcu_as_sc_mcu7t3v3 verilog model.
 // Used by GLS as a drop-in replacement for the upstream library file because:
 //   1. dfsrtp_2: upstream declares Q as wire but assigns to it inside an
@@ -138,7 +140,7 @@ module gf180mcu_as_sc_mcu7t3v3__buff_8(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -160,7 +162,7 @@ module gf180mcu_as_sc_mcu7t3v3__buff_12(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -224,7 +226,7 @@ module gf180mcu_as_sc_mcu7t3v3__clkbuff_4(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -246,7 +248,7 @@ module gf180mcu_as_sc_mcu7t3v3__clkbuff_8(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -268,7 +270,7 @@ module gf180mcu_as_sc_mcu7t3v3__clkbuff_12(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -290,7 +292,7 @@ module gf180mcu_as_sc_mcu7t3v3__inv_2(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -312,7 +314,7 @@ module gf180mcu_as_sc_mcu7t3v3__inv_4(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );
@@ -334,7 +336,7 @@ module gf180mcu_as_sc_mcu7t3v3__inv_6(
 	input VNW,
 	input VDD,
 	input VSS,
-	
+
 	input A,
 	output Y
 );

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
+
 # SRAM macros
 
 define_pdn_grid \

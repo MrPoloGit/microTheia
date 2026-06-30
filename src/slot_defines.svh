@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
+
 `ifdef SLOT_1X1
 
 // Power/ground pads for core and I/O

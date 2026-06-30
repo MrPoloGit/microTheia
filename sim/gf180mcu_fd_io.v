@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Group G Contributors
 //
 // Simulator-friendly replacements for the gf180mcu_fd_io IO pad cells used
 // by the chip_top netlist. The upstream models in

@@ -816,7 +816,7 @@ async def _classify_one_recording(dut, bin_path):
     # Allow any same-cycle gesture_valid log to settle, then stop monitoring.
     await ClockCycles(dut.clk, 1)
 
-    monitor_task.kill()
+    monitor_task.cancel()
 
     if not monitor.class_events:
         raise AssertionError(
@@ -914,7 +914,7 @@ async def test_soc_boot_stream_over_spi(dut):
 
     await boot_core_over_spi(dut, hs_monitor=hs)
 
-    hs_task.kill()
+    hs_task.cancel()
 
     min_expected = NUM_CLASSES * FEATURE_COUNT
     assert hs.count >= min_expected, (

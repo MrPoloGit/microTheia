@@ -39,3 +39,5 @@ cocotb/*.txt
 
 # Parallel GLS run artifacts (one set per gesture)
 logs/
+
+docs/style.md

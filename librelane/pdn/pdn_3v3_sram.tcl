@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Group G Contributors
+
 # SRAM macros
 
 # Dump all block (macro) instance names to macro_instances.txt in the run
