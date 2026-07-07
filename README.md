@@ -15,7 +15,7 @@
 - **Output / debug:** Classification results are available over SPI and through selectable debug/output pins.
 - **Frequency:** 64 MHz on-chip and 32 MHz SPI
 
-### Project status: Ready for manufacture.
+### Project status: Submitted for manufacture.
 
 ## Documentation
 
