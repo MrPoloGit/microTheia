@@ -302,19 +302,22 @@ STA_NETLIST ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/51-openroad-fillinserti
 # STA_SDF below for why we preprocess it.
 STA_SDF_RAW ?= $(MAKEFILE_DIR)/librelane/runs/$(STA_RUN)/54-openroad-stapostpnr/$(STA_CORNER)/chip_top__$(STA_CORNER).sdf
 # Icarus-friendly SDF produced from STA_SDF_RAW by scripts/sdf_fix_for_icarus.py.
-# Icarus 13's SDF parser has three specific gaps that make the raw file fatal:
+# Icarus 13's SDF parser has several specific gaps that make the raw file fatal
+# or too noisy to use directly:
 #   1. (VOLTAGE max::min) / (TEMPERATURE max::min) header triplets have an
 #      empty typ slot. Icarus aborts with "Chosen value not defined".
-#   2. INTERCONNECT entries that reference IO pad / SRAM instances with
+#   2. TIMINGCHECK sections are parsed but not implemented by Icarus 13, so
+#      keeping them only floods the log with unsupported-check warnings.
+#   3. INTERCONNECT entries that reference IO pad / SRAM instances with
 #      escaped names (e.g. `analog\[1\]\.pad.ASIG5V`) crash vvp with a NULL
 #      handle in vpi_scan — Icarus's path splitter doesn't honour SDF v3.0
 #      backslash escapes inside INTERCONNECT scopes.
-#   3. CELL blocks for flattened instance names with escaped dots/brackets hit
+#   4. CELL blocks for flattened instance names with escaped dots/brackets hit
 #      the same path-splitting limitation and cannot be annotated by Icarus.
-# The preprocessor fixes the triplets and strips unannotatable INTERCONNECT
-# entries plus CELL blocks whose flattened instance names contain escaped dots
-# or brackets. Flat std-cell IOPATHs, TIMINGCHECKs, and conditional delays
-# are left untouched.
+# The preprocessor fixes the triplets, strips unsupported TIMINGCHECK blocks,
+# and strips unannotatable INTERCONNECT entries plus CELL blocks whose flattened
+# instance names contain escaped dots or brackets. Flat std-cell IOPATHs and
+# conditional delays are left untouched.
 STA_SDF ?= $(MAKEFILE_DIR)/cocotb/sdf/$(STA_RUN)/chip_top__$(STA_CORNER).icarus.sdf
 
 $(STA_SDF): $(STA_SDF_RAW) $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py
@@ -323,7 +326,7 @@ $(STA_SDF): $(STA_SDF_RAW) $(MAKEFILE_DIR)/scripts/sdf_fix_for_icarus.py
 sim-gl-sta: $(STA_SDF) ## Run timed STA gate-level simulation with SDF, reset smoke test only
 	cd cocotb; LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
 	WAVES=0 \
-	FORCE_REBUILD=${FORCE_REBUILD} \
+	FORCE_REBUILD=$${FORCE_REBUILD:-1} \
 	COCOTB_TEST_FILTER=test_reset_and_spi_ready \
 	GL_NETLIST=$(STA_NETLIST) \
 	SDF_FILE=$(STA_SDF) \
@@ -336,17 +339,17 @@ sim-gl-sta-parallel: $(STA_SDF) ## Run all 4 gestures in parallel with timed STA
 	@echo "Launching 4 parallel STA GLS classify runs (gestures 0-3, Icarus + SDF) …"
 	@set -e ; for g in 0 1 2 3 ; do \
 		LD_LIBRARY_PATH="" SIM=icarus GL=1 TIMING=1 \
-		  WAVES=0 \
-		  FORCE_REBUILD=$${FORCE_REBUILD:-0} \
-		  PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
-		  GL_NETLIST=$(STA_NETLIST) \
-		  SDF_FILE=$(STA_SDF) \
-		  GESTURE_INDICES=$$g \
-		  COCOTB_TEST_FILTER=test_classify_all_gestures \
-		  SIM_BUILD=$(MAKEFILE_DIR)/cocotb/sim_build_sta_gl_g$$g \
-		  RESULTS_XML=$(MAKEFILE_DIR)/logs/results_sta_gl_g$$g.xml \
-		  python3 $(MAKEFILE_DIR)/cocotb/chip_top_tb.py \
-		  > $(MAKEFILE_DIR)/logs/sta_gls_gesture_$$g.log 2>&1 & \
+		WAVES=0 \
+		FORCE_REBUILD=$${FORCE_REBUILD:-1} \
+		PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} \
+		GL_NETLIST=$(STA_NETLIST) \
+		SDF_FILE=$(STA_SDF) \
+		GESTURE_INDICES=$$g \
+		COCOTB_TEST_FILTER=test_classify_all_gestures \
+		SIM_BUILD=$(MAKEFILE_DIR)/cocotb/sim_build_sta_gl_g$$g \
+		RESULTS_XML=$(MAKEFILE_DIR)/logs/results_sta_gl_g$$g.xml \
+		python3 $(MAKEFILE_DIR)/cocotb/chip_top_tb.py \
+		> $(MAKEFILE_DIR)/logs/sta_gls_gesture_$$g.log 2>&1 & \
 		echo "  PID $$! → gesture $$g, log: logs/sta_gls_gesture_$$g.log" ; \
 	done ; \
 	wait
